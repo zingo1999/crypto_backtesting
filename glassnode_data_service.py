@@ -63,6 +63,7 @@ class GlassnodeDataService:
             metadata_df = pd.DataFrame([self.endpoint], columns=['path'])
         since = self.since if not isinstance(self.since, str) else int(pd.to_datetime(self.since).timestamp())
         if since > 1_00_000_000_000: int(since / 1000)
+        if self.timeframe == '1d': self.timeframe = '24h'
         timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
 
 

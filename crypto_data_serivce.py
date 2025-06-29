@@ -67,9 +67,8 @@ class CryptoDataService:
         data = row['o']
         extracted = {}
 
-        # 提取特定鍵的數據
         for key in data.keys():
-            if len(data) > 2:
+            if len(data) >= 2:
                 extracted[key] = data[key]
         return pd.Series(extracted)
 
@@ -86,17 +85,12 @@ class CryptoDataService:
                 extracted_df = factor_df.apply(self.extract_values, axis=1)
                 factor_df = pd.concat([factor_df, extracted_df], axis=1)
 
-                # if self.endpoint in ['/derivatives/futures_funding_rate_perpetual_all', '/derivatives/futures_funding_rate_perpetual_all_v2']:
-                #     factor_df['average_rate'] = (factor_df['o'].apply(lambda x: x['deribit']) + factor_df['o'].apply(lambda x: x['mean'])) / 2
-                #     factor_df = factor_df[['t', 'average_rate']]
-                # else:
-                #     factor_df['open'] = factor_df['o'].apply(lambda x: x['o'])
-                #     factor_df['high'] = factor_df['o'].apply(lambda x: x['h'])
-                #     factor_df['low'] = factor_df['o'].apply(lambda x: x['l'])
-                #     factor_df['close'] = factor_df['o'].apply(lambda x: x['c'])
-                #     factor_df = factor_df[['t', 'close']]
+                factor_df['average_value'] = factor_df.iloc[:, 2:].mean(axis=1)
+                pass
+
             factor_df = factor_df.copy()
             factor_df.loc[:, 't'] = factor_df['t'] * 1000
+            factor_df = factor_df[['t', factor_df.columns[-1]]]
             factor_df.rename(columns={'t': 'unix_timestamp', factor_df.columns[-1]: 'factor'}, inplace=True)
 
             pass
