@@ -39,12 +39,15 @@ class CryptoDataService:
     def create_factor_df(self):
         factor_df = pd.DataFrame()
         if self.data_source == 'exchange':
-            exchange_data = CryptoExchangeDataService(self.factor_currency, **self.kwargs)
-            factor_df = exchange_data.get_historical_data()
+            # exchange_data = CryptoExchangeDataService(self.factor_currency, **self.kwargs)
+            # factor_df = exchange_data.get_historical_data()
+            factor_df = CryptoExchangeDataService(self.factor_currency, **self.kwargs).get_historical_data()
 
         elif self.data_source == 'glassnode':
-            gn_service = GlassnodeDataService(self.kwargs)
-            factor_df = gn_service.fetch_data()
+            # gn_service = GlassnodeDataService(self.kwargs)
+            # factor_df = gn_service.fetch_data()
+            factor_df = GlassnodeDataService(self.kwargs).fetch_data()
+
         return factor_df
 
     def create_price_df(self):

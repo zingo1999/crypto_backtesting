@@ -14,8 +14,8 @@ if __name__ == '__main__':
     # since           = '2025-06-01'
     timeframe       = '1h'
 
-    data_source     = 'exchange'
-    endpoint        = 'price'
+    data_source     = 'glassnode'        # glassnode
+    endpoint        = 'derivatives'       # options_25delta_skew_3_months
     exchange_name   = 'bybit'
     product_type    = 'linear'
     update_mode     = True

@@ -2,13 +2,13 @@
 import logging
 import datetime
 import os
-import requests
 import sys
 import time
 from typing import Dict, List, Optional, Union
 
 # Third-party imports
 import ccxt
+import requests
 import pandas as pd
 # from ccxt.base.exchange import Exchange
 

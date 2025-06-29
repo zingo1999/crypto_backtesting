@@ -2,11 +2,10 @@
 import os
 import time
 
-import requests
-
 
 # Third-party imports
 import pandas as pd
+import requests
 
 
 # Custom imports
@@ -44,7 +43,7 @@ class GlassnodeDataService:
     metadata_list = response.json()
 
     def __init__(self, parameters):
-        self.base_url = "https://api.glassnode.com"
+        self.base_url = "https://api.glassnode.com/v1/metrics"
         self.factor_currency = parameters['factor_currency']
         self.endpoint = parameters['endpoint']
         self.since = parameters['since']
@@ -58,7 +57,10 @@ class GlassnodeDataService:
     def fetch_data(self, exchange_name='deribit'):
 
         # factor_currency = self.factor_currency.upper()
-        metadata_df = self.metadata_df[self.metadata_df['path'].str.contains(self.endpoint)].reset_index(drop=True) if isinstance(self.endpoint, str) else self.metadata_df
+        try:
+            metadata_df = self.metadata_df[self.metadata_df['path'].str.contains(self.endpoint)].reset_index(drop=True) if isinstance(self.endpoint, str) else self.metadata_df
+        except:
+            metadata_df = pd.DataFrame([self.endpoint], columns=['path'])
         since = self.since if not isinstance(self.since, str) else int(pd.to_datetime(self.since).timestamp())
         if since > 1_00_000_000_000: int(since / 1000)
         timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
