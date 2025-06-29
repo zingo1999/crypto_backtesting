@@ -69,6 +69,9 @@ class GlassnodeDataService:
         endpoint_path = metadata_df['path'].iloc[0]
         category = endpoint_path.split('/')[-2]
         endpoint = endpoint_path.split('/')[-1]
+
+        print(endpoint)
+
         params = {
                 'api_key': self.DATA_SOURCE_KEY,
                 'a': self.factor_currency,

@@ -140,6 +140,7 @@ class Utilities:
                 df['sd'] = df['factor'].rolling(x).std()
                 df['z'] = (df['factor'] - df['ma']) / df['sd']
                 max_threshold = df['z'].std() * multiple
+                if np.isnan(max_threshold): max_threshold = 2.5
 
         elif indicator == 'rsi':
             if not max_threshold:
