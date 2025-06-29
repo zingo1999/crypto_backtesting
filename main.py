@@ -6,16 +6,16 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 if __name__ == '__main__':
 
     factor_currency = 'btc'
-    asset_currency  = 'sol'
-    action          = 'long_only'
+    asset_currency  = 'eth'
+    action          = 'long_short'
     indicator       = 'bband'
-    orientation     = ''
+    orientation     = 'momentum'
     since           = '2020-05-01'
     # since           = '2025-06-01'
     timeframe       = '1h'
 
     data_source     = 'glassnode'        # glassnode
-    endpoint        = 'derivatives'       # options_25delta_skew_3_months
+    endpoint        = 'supply_distribution_relative'       # options_25delta_skew_3_months
     exchange_name   = 'bybit'
     product_type    = 'linear'
     update_mode     = True

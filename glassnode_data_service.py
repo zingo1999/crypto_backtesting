@@ -54,7 +54,7 @@ class GlassnodeDataService:
         endpoint_list = [item for item in self.metadata_list if self.endpoint in item]
         return endpoint_list
 
-    def fetch_data(self, exchange_name='deribit'):
+    def fetch_data(self, exchange_name='binance'):
 
         # factor_currency = self.factor_currency.upper()
         try:
@@ -70,6 +70,7 @@ class GlassnodeDataService:
         category = endpoint_path.split('/')[-2]
         endpoint = endpoint_path.split('/')[-1]
 
+        if category == 'derivatives': exchange_name = 'deribit'
         print(endpoint)
 
         params = {
