@@ -141,12 +141,12 @@ class CryptoDataService:
                                         # 't_plus': t_plus,
                                         'threshold_list': threshold_list,
                                         'timeframe': timeframe,
-                                        'title': f"{factor_currency}_{asset_currency}_{self.data_source}_{self.endpoint}_{timeframe}_{indicator}_{orientation}_{action}",
+                                        'title': f"{factor_currency}_{asset_currency}_{self.data_source}_{endpoint}_{timeframe}_{indicator}_{orientation}_{action}",
                                         'action': action,
                                         'orientation': orientation, }
                                     backtest_combos.append(para_combination)
 
-                        num_cores = min(len(backtest_combos), 6)
+                        num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
                         pool = mp.Pool(processes=num_cores)
                         backtest_results = pool.map(Utilities.backtest_engine, backtest_combos)
                         pool.close()
