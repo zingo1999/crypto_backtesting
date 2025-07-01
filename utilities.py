@@ -130,9 +130,10 @@ class Utilities:
 
 
     @classmethod
-    def generate_threshold_list(cls, df, indicator, multiple=1.2, max_threshold=0, number_of_interval=10, x=2):
+    def generate_threshold_list(cls, df, indicator, max_threshold, number_of_interval, multiple=1.2):
         first_threshold_step = 0
-        threshold_hit_rate = 30
+        x = 2
+        if not number_of_interval: number_of_interval = 10
 
         if indicator == 'bband':
             if not max_threshold:
@@ -140,8 +141,8 @@ class Utilities:
                 df['sd'] = df['factor'].rolling(x).std()
                 df['z'] = (df['factor'] - df['ma']) / df['sd']
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
-
                 if np.isnan(max_threshold): max_threshold = 2.5
+            else: max_threshold = max(0.1, max_threshold)
 
         elif indicator == 'rsi':
             if not max_threshold:
@@ -154,23 +155,27 @@ class Utilities:
                 df['relative_strength'] = df['average_gain'] / df['average_loss']
                 df['z'] = 100 - (100 / (1 + df['relative_strength']))
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+            else: max_threshold = max(0.1, min(max_threshold, 55.5))
 
         elif indicator == 'ma_diff':
             if not max_threshold:
                 df['ma'] = df['factor'].rolling(x).mean()
                 df['z'] = df['factor'] / df['ma'] - 1
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+            else: max_threshold = max(0.000001, max_threshold)
 
         elif indicator == 'roc':
             if not max_threshold:
                 df['z'] = df['factor'].pct_change(periods=x) * 100
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+            else: max_threshold = max(0.000001, max_threshold)
 
         elif indicator == 'ma_roc':
             if not max_threshold:
                 df['ma'] = df['factor'].rolling(x).mean()
                 df['z'] = df['ma'].pct_change(periods=1) * 100
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+            else: max_threshold = max(0.000001, max_threshold)
 
         elif indicator == 'percentile_rank':
             if not max_threshold:
@@ -394,10 +399,7 @@ class Utilities:
             if save_result is True:
                 return all_results
 
-
-
         result = strategy_effectiveness(**backtest_combos)
-        # sharpe, mdd, calmar, max_drawdown_days, trades, cumu, annual_return, benchmark_sharpe, pos_count, win_rate = (result[-1][key] for key in ['sharpe', 'mdd', 'calmar', 'max_drawdown_days', 'trades', 'cumu', 'annual_return', 'benchmark_sharpe', 'pos_count', 'win_rate'])
         if result:
             return result
 

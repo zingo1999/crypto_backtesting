@@ -25,6 +25,8 @@ class CryptoDataService:
         self.endpoint = ''
         self.factor_currency = ''
         self.indicator = ''
+        self.max_threshold = ''
+        self.number_of_interval = ''
         self.orientation = ''
         self.timeframe = ''
         for key, value in kwargs.items(): setattr(self, key, value)
@@ -34,7 +36,7 @@ class CryptoDataService:
         self.factor_currency_list = [self.factor_currency.upper()] if self.factor_currency else ['BTC', 'ETH', 'SOL']
         self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi', 'ma_diff', 'ma_roc']
         self.orientation_list = [self.orientation] if self.orientation else ['momentum', 'reversion']
-        self.timeframe_list = [self.timeframe] if self.timeframe else ['1h', '1d']
+        self.timeframe_list = [self.timeframe] if self.timeframe else ['10m', '1h', '1d']
 
     def create_factor_df(self):
         factor_df = pd.DataFrame()
@@ -123,7 +125,7 @@ class CryptoDataService:
                         backtest_combos = []
                         for indicator in self.indicator_list:
 
-                            threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator)
+                            threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator, self.max_threshold, self.number_of_interval)
                             # if indicator == 'roc': threshold_list = all_lookback_lists[0][:15]
                             # else: threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator)
                             for orientation in self.orientation_list:
@@ -153,7 +155,7 @@ class CryptoDataService:
                             backtest_results = pool.map(Utilities.backtest_engine, backtest_combos)
                             pool.close()
                         else:
-                            backtest_results = Utilities.backtest_engine(backtest_combos[0])
+                            backtest_results = [Utilities.backtest_engine(backtest_combos[0])]
 
                         if backtest_results:
                             backtest_results = [result for result in backtest_results if result is not None]

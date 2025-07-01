@@ -5,10 +5,10 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 
 if __name__ == '__main__':
 
-    factor_currency = ''
-    asset_currency  = 'eth'
+    factor_currency = 'btc'
+    asset_currency  = 'btc'
     action          = 'long_only'
-    indicator       = 'ma_diff'
+    indicator       = 'ma_roc'
     orientation     = 'momentum'
     since           = '2020-05-01'
     # since           = '2025-06-01'
@@ -18,7 +18,10 @@ if __name__ == '__main__':
     endpoint        = 'active_1m_3m'       # options_25delta_skew_3_months implied
     exchange_name   = 'bybit'
     product_type    = 'linear'
-    update_mode     = True
+
+    update_mode         = True
+    max_threshold       = 0
+    number_of_interval  = 0
 
     kwargs = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
 
