@@ -139,7 +139,8 @@ class Utilities:
                 df['ma'] = df['factor'].rolling(x).mean()
                 df['sd'] = df['factor'].rolling(x).std()
                 df['z'] = (df['factor'] - df['ma']) / df['sd']
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+
                 if np.isnan(max_threshold): max_threshold = 2.5
 
         elif indicator == 'rsi':
@@ -152,29 +153,29 @@ class Utilities:
                 df['average_loss'] = abs(df['negative'].rolling(x).mean())
                 df['relative_strength'] = df['average_gain'] / df['average_loss']
                 df['z'] = 100 - (100 / (1 + df['relative_strength']))
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
 
         elif indicator == 'ma_diff':
             if not max_threshold:
                 df['ma'] = df['factor'].rolling(x).mean()
                 df['z'] = df['factor'] / df['ma'] - 1
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
 
         elif indicator == 'roc':
             if not max_threshold:
                 df['z'] = df['factor'].pct_change(periods=x) * 100
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
 
         elif indicator == 'ma_roc':
             if not max_threshold:
                 df['ma'] = df['factor'].rolling(x).mean()
                 df['z'] = df['ma'].pct_change(periods=1) * 100
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
 
         elif indicator == 'percentile_rank':
             if not max_threshold:
                 df['z'] = df['factor'].rank(pct=True) * 100 - 50
-                max_threshold = df['z'].std() * multiple
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
                 pass
 
 
@@ -188,8 +189,6 @@ class Utilities:
         threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
-
-
     @classmethod
     def backtest_engine(cls, backtest_combos):
         def strategy_effectiveness(action, all_lookback_lists, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
@@ -201,14 +200,15 @@ class Utilities:
                     df['sd'] = df['factor'].rolling(x).std()
                     df['z'] = (df['factor'] - df['ma']) / df['sd']
 
-                    bband_action_dict = {
-                        'momentum_long_short': np.where(df['z'] > y, 1, np.where(df['z'] < -y, -1, 0)),
-                        'momentum_long_only': np.where(df['z'] > y, 1, 0),
-                        'momentum_short_only': np.where(df['z'] < -y, -1, 0),
-                        'reversion_long_short': np.where(df['z'] > y, -1, np.where(df['z'] < -y, 1, 0)),
-                        'reversion_long_only': np.where(df['z'] < -y, 1, 0),
-                        'reversion_short_only': np.where(df['z'] > y, -1, 0), }
-                    df['pos'] = bband_action_dict[strategy]
+                    bband_action_map = {
+                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
+                    }
+                    df['pos'] = bband_action_map[strategy](df['z'])
 
                 elif indicator == 'rsi':
                     df['delta'] = df['factor'].diff(1)
@@ -220,14 +220,15 @@ class Utilities:
                     df['relative_strength'] = df['average_gain'] / df['average_loss']
                     df['z'] = 100 - (100 / (1 + df['relative_strength']))
                     upper_bond, lower_bond = 50 + y, 50 - y
-                    rsi_action_dict = {
-                        'momentum_long_short': np.where(df['z'] > upper_bond, 1, np.where(df['z'] < lower_bond, -1, 0)),
-                        'momentum_long_only': np.where(df['z'] > upper_bond, 1, 0),
-                        'momentum_short_only': np.where(df['z'] < lower_bond, -1, 0),
-                        'reversion_long_short': np.where(df['z'] > upper_bond, -1, np.where(df['z'] < lower_bond, 1, 0)),
-                        'reversion_long_only': np.where(df['z'] < lower_bond, 1, 0),
-                        'reversion_short_only': np.where(df['z'] > upper_bond, -1, 0), }
-                    df['pos'] = rsi_action_dict[strategy]
+                    rsi_action_map = {
+                        'momentum_long_short': lambda z: np.where(z > upper_bond, 1, np.where(z < lower_bond, -1, 0)),
+                        'momentum_long_only': lambda z: np.where(z > upper_bond, 1, 0),
+                        'momentum_short_only': lambda z: np.where(z < lower_bond, -1, 0),
+                        'reversion_long_short': lambda z: np.where(z > upper_bond, -1, np.where(z < lower_bond, 1, 0)),
+                        'reversion_long_only': lambda z: np.where(z < lower_bond, 1, 0),
+                        'reversion_short_only': lambda z: np.where(z > upper_bond, -1, 0),
+                    }
+                    df['pos'] = rsi_action_map[strategy](df['z'])
 
                 elif indicator == 'percentile_rank':
 
@@ -239,15 +240,15 @@ class Utilities:
                     df['ma'] = df['factor'].rolling(x).mean()
                     df['z'] = df['factor'] / df['ma'] - 1
 
-                    ma_diff_action_dict = {
-                        'momentum_long_short': np.where(df['z'] > y, 1, np.where(df['z'] < -y, -1, 0)),
-                        'momentum_long_only': np.where(df['z'] > y, 1, 0),
-                        'momentum_short_only': np.where(df['z'] < -y, -1, 0),
-                        'reversion_long_short': np.where(df['z'] > y, -1, np.where(df['z'] < -y, 1, 0)),
-                        'reversion_long_only': np.where(df['z'] < -y, 1, 0),
-                        'reversion_short_only': np.where(df['z'] > y, -1, 0),
+                    ma_diff_action_map = {
+                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
                     }
-                    df['pos'] = ma_diff_action_dict[strategy]
+                    df['pos'] = ma_diff_action_map[strategy](df['z'])
 
                 elif indicator == 'ma':
                     df['ma'] = df['factor'].rolling(x).mean()
@@ -257,28 +258,30 @@ class Utilities:
 
                     df['z'] = df['factor'].pct_change(periods=x) * 100
 
-                    roc_action_dict = {
-                        'momentum_long_short': np.where(df['z'] > y, 1, np.where(df['z'] < -y, -1, 0)),
-                        'momentum_long_only': np.where(df['z'] > y, 1, 0),
-                        'momentum_short_only': np.where(df['z'] < -y, -1, 0),
-                        'reversion_long_short': np.where(df['z'] > y, -1, np.where(df['z'] < -y, 1, 0)),
-                        'reversion_long_only': np.where(df['z'] < -y, 1, 0),
-                        'reversion_short_only': np.where(df['z'] > y, -1, 0), }
-                    df['pos'] = roc_action_dict[strategy]
+                    roc_action_map = {
+                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
+                    }
+                    df['pos'] = roc_action_map[strategy](df['z'])
 
                 elif indicator == 'ma_roc':
 
                     df['ma'] = df['factor'].rolling(x).mean()
                     df['z'] = df['ma'].pct_change(periods=1) * 100
 
-                    ma_roc_action_dict = {
-                        'momentum_long_short': np.where(df['z'] > y, 1, np.where(df['z'] < -y, -1, 0)),
-                        'momentum_long_only': np.where(df['z'] > y, 1, 0),
-                        'momentum_short_only': np.where(df['z'] < -y, -1, 0),
-                        'reversion_long_short': np.where(df['z'] > y, -1, np.where(df['z'] < -y, 1, 0)),
-                        'reversion_long_only': np.where(df['z'] < -y, 1, 0),
-                        'reversion_short_only': np.where(df['z'] > y, -1, 0), }
-                    df['pos'] = ma_roc_action_dict[strategy]
+                    ma_roc_action_map = {
+                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
+                    }
+                    df['pos'] = ma_roc_action_map[strategy](df['z'])
 
 
                     pass
@@ -315,7 +318,7 @@ class Utilities:
                             'x': x,
                             'y': y,
                         }
-                        df = df.iloc[:, :3]
+                        # df = df.iloc[:, :3]
                         df['chg'] = df['price'].pct_change()
                         df['pos'] = compute_position(**parameters)
                         df['pos_count'] = (df['pos'] != 0).cumsum()
@@ -400,6 +403,7 @@ class Utilities:
 
     @classmethod
     def generate_heatmap(cls, all_heatmaps, show_heatmap=False):
+
         for group_currency in all_heatmaps:
             for heatmap_dict in group_currency:
                 total_heatmaps = len(heatmap_dict)

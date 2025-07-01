@@ -5,17 +5,17 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 
 if __name__ == '__main__':
 
-    factor_currency = 'btc'
-    asset_currency  = 'sol'
-    action          = ''
-    indicator       = 'bband'
-    orientation     = ''
+    factor_currency = ''
+    asset_currency  = 'eth'
+    action          = 'long_only'
+    indicator       = 'ma_diff'
+    orientation     = 'momentum'
     since           = '2020-05-01'
     # since           = '2025-06-01'
-    timeframe       = '1h'
+    timeframe       = '1d'
 
     data_source     = 'glassnode'        # glassnode
-    endpoint        = 'implied'       # options_25delta_skew_3_months
+    endpoint        = 'active_1m_3m'       # options_25delta_skew_3_months implied
     exchange_name   = 'bybit'
     product_type    = 'linear'
     update_mode     = True

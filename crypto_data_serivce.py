@@ -32,7 +32,7 @@ class CryptoDataService:
         self.action_list = [self.action] if self.action else ['long_short', 'long_only', 'short_only']
         self.asset_currency_list = [self.asset_currency.upper()] if self.asset_currency else ['BTC', 'ETH', 'SOL']
         self.factor_currency_list = [self.factor_currency.upper()] if self.factor_currency else ['BTC', 'ETH', 'SOL']
-        self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi', 'ma_diff']
+        self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi', 'ma_diff', 'ma_roc']
         self.orientation_list = [self.orientation] if self.orientation else ['momentum', 'reversion']
         self.timeframe_list = [self.timeframe] if self.timeframe else ['1h', '1d']
 
@@ -122,6 +122,7 @@ class CryptoDataService:
                         all_lookback_lists = Utilities.generate_lookback_lists(backtest_df.copy())
                         backtest_combos = []
                         for indicator in self.indicator_list:
+
                             threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator)
                             # if indicator == 'roc': threshold_list = all_lookback_lists[0][:15]
                             # else: threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator)
@@ -146,12 +147,17 @@ class CryptoDataService:
                                         'orientation': orientation, }
                                     backtest_combos.append(para_combination)
 
-                        num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
-                        pool = mp.Pool(processes=num_cores)
-                        backtest_results = pool.map(Utilities.backtest_engine, backtest_combos)
-                        pool.close()
-                        backtest_results = [result for result in backtest_results if result is not None]
-                        if backtest_results: all_results.append(backtest_results)
+                        if len(backtest_combos) > 1:
+                            num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
+                            pool = mp.Pool(processes=num_cores)
+                            backtest_results = pool.map(Utilities.backtest_engine, backtest_combos)
+                            pool.close()
+                        else:
+                            backtest_results = Utilities.backtest_engine(backtest_combos[0])
+
+                        if backtest_results:
+                            backtest_results = [result for result in backtest_results if result is not None]
+                            all_results.append(backtest_results)
 
 
                         # if any(element is not None for element in backtest_results):
