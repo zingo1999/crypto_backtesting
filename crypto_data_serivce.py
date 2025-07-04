@@ -152,10 +152,10 @@ class CryptoDataService:
                         if len(backtest_combos) > 1:
                             num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
                             pool = mp.Pool(processes=num_cores)
-                            backtest_results = pool.map(Utilities.backtest_engine, backtest_combos)
+                            backtest_results = pool.map(Utilities.alpha_engine, backtest_combos)
                             pool.close()
                         else:
-                            backtest_results = [Utilities.backtest_engine(backtest_combos[0])]
+                            backtest_results = [Utilities.alpha_engine(backtest_combos[0])]
 
                         if backtest_results:
                             backtest_results = [result for result in backtest_results if result is not None]

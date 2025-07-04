@@ -195,7 +195,7 @@ class Utilities:
         return threshold_list
 
     @classmethod
-    def backtest_engine(cls, backtest_combos):
+    def alpha_engine(cls, backtest_combos):
         def strategy_effectiveness(action, all_lookback_lists, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
             def compute_position(df, indicator, action, orientation, x, y, **kwargs):
                 strategy = f"{orientation}_{action}"
