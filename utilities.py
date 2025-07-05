@@ -29,7 +29,7 @@ class Utilities:
         '12h': 365 * 2,
         '24h': 365,
         '1d': 365,
-        '1w': 365 / 7,
+        '1w': 365 // 7,
         '1month': 12}
     TIMEFRAME_DAYS_MAP = {
         '1m': 1 / (24 * 60),  # 1 minute

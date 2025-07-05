@@ -8,7 +8,7 @@ if __name__ == '__main__':
     factor_currency = 'btc'
     asset_currency  = 'btc'
     action          = 'long_only'
-    indicator       = 'ma_roc'
+    indicator       = 'bband'
     orientation     = 'momentum'
     since           = '2020-05-01'
     # since           = '2025-06-01'
@@ -22,6 +22,8 @@ if __name__ == '__main__':
     update_mode         = True
     max_threshold       = 0
     number_of_interval  = 0
+
+    cross_validate = True
 
     kwargs = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
 

@@ -1,6 +1,7 @@
 import pandas as pd
 import multiprocessing as mp
 
+from backtest_engine import BacktestEngine
 from crypto_exchange_data_service import CryptoExchangeDataService
 from glassnode_data_service import GlassnodeDataService
 from utilities import Utilities
@@ -101,6 +102,7 @@ class CryptoDataService:
         backtest_df = pd.merge(factor_df, price_df, how='inner', on='unix_timestamp')
         backtest_df = backtest_df.assign(datetime=lambda x: pd.to_datetime(x['unix_timestamp'], unit='ms'))
         backtest_df = backtest_df.drop_duplicates(subset='unix_timestamp', keep='last').sort_values('unix_timestamp').set_index('datetime').dropna()
+        backtest_df['chg'] = backtest_df['price'].pct_change()
         return backtest_df
 
     def backtest_combinations(self,):
@@ -152,10 +154,12 @@ class CryptoDataService:
                         if len(backtest_combos) > 1:
                             num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
                             pool = mp.Pool(processes=num_cores)
-                            backtest_results = pool.map(Utilities.alpha_engine, backtest_combos)
+                            # backtest_results = pool.map(Utilities.alpha_engine, backtest_combos)
+                            backtest_results = pool.map(BacktestEngine.performance_evaluation, backtest_combos)
                             pool.close()
                         else:
-                            backtest_results = [Utilities.alpha_engine(backtest_combos[0])]
+                            # backtest_results = [Utilities.alpha_engine(backtest_combos[0])]
+                            backtest_results = [BacktestEngine.performance_evaluation(backtest_combos[0])]
 
                         if backtest_results:
                             backtest_results = [result for result in backtest_results if result is not None]
