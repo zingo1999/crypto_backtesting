@@ -22,6 +22,7 @@ class CryptoDataService:
 
         self.action = ''
         self.asset_currency = ''
+        self.cross_validate = ''
         self.data_source = ''
         self.endpoint = ''
         self.factor_currency = ''
@@ -152,7 +153,7 @@ class CryptoDataService:
                                     backtest_combos.append(para_combination)
 
                         if len(backtest_combos) > 1:
-                            num_cores = min(len(backtest_combos), mp.cpu_count() - 1)
+                            num_cores = max(1, min(len(backtest_combos), mp.cpu_count() - 2))
                             pool = mp.Pool(processes=num_cores)
                             # backtest_results = pool.map(Utilities.alpha_engine, backtest_combos)
                             backtest_results = pool.map(BacktestEngine.performance_evaluation, backtest_combos)
@@ -170,5 +171,26 @@ class CryptoDataService:
                         #     all_results.append(backtest_results)
 
 
+        if self.cross_validate is True:
+            for group_currency in all_results:
+                for result_dict in group_currency:
+                    result_list = []
+                    for i in range(len(result_dict)):
+                        data = result_dict[i]['result']
+                        result_list += data
+                    temp_df = pd.DataFrame(result_list)
+                    temp_df = temp_df[temp_df['sharpe'] >= 1]
+                    temp_df = temp_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+                    for j in range(len(temp_df)):
+
+                        parameters = {
+                            'df': backtest_df,
+                            'indicator': self.indicator,
+                            'orientation': self.orientation,
+                            'action': self.action,
+                            'timeframe': self.timeframe,
+                            'x': temp_df['x'].iloc[j],
+                            'y': temp_df['y'].iloc[j],
+                        }
+                    pass
         Utilities.generate_heatmap(all_results, True)
-        pass
