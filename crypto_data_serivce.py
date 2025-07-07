@@ -135,6 +135,7 @@ class CryptoDataService:
                             for orientation in self.orientation_list:
                                 for action in self.action_list:
                                     para_combination = {
+                                        'action': action,
                                         'asset_currency': asset_currency,
                                         'df': backtest_df,
                                         # 'data_source': data_source,
@@ -142,15 +143,15 @@ class CryptoDataService:
                                         'factor_currency': factor_currency,
                                         'indicator': indicator,
                                         'lookback_list': lookback_list,
+                                        'orientation': orientation,
                                         # 'max_recovery_days': max_recovery_days,
                                         # 'minimum_sharpe': minimum_sharpe,
                                         # 'minimum_trades': minimum_trades,
                                         # 't_plus': t_plus,
+                                        'strategy': f"{indicator}_{orientation}_{action}",
                                         'threshold_list': threshold_list,
                                         'timeframe': timeframe,
-                                        'title': f"{factor_currency}_{asset_currency}_{self.data_source}_{endpoint}_{timeframe}_{indicator}_{orientation}_{action}",
-                                        'action': action,
-                                        'orientation': orientation, }
+                                        'title': f"{factor_currency}_{asset_currency}_{self.data_source}_{endpoint}_{timeframe}_{indicator}_{orientation}_{action}",}
                                     backtest_combos.append(para_combination)
 
                         if len(backtest_combos) > 1:
@@ -173,27 +174,36 @@ class CryptoDataService:
 
 
         if self.cross_validate is True:
+            tasks = []
             for group_currency in all_results:
                 for result_dict in group_currency:
                     result_list = []
                     for i in range(len(result_dict)):
                         data = result_dict[i]['result']
-                        for k in range(len(data)):
-                            data[k]['strategy'] = result_dict[i]['title']
+                        # for k in range(len(data)):
+                        #     data[k]['strategy'] = result_dict[i]['strategy']
                         result_list += data
                     temp_df = pd.DataFrame(result_list)
                     temp_df = temp_df[temp_df['sharpe'] >= 1]
                     temp_df = temp_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
                     for j in range(len(temp_df)):
-
+                        indicator = temp_df['indicator'].iloc[j]
+                        x = temp_df['x'].iloc[j]
+                        y = temp_df['y'].iloc[j]
                         parameters = {
+                            'action': temp_df['action'].iloc[j],
                             'df': backtest_df,
-                            'indicator': self.indicator,
-                            'orientation': self.orientation,
-                            'action': self.action,
-                            'timeframe': self.timeframe,
-                            'x': temp_df['x'].iloc[j],
-                            'y': temp_df['y'].iloc[j],
+                            'indicator': indicator,
+                            'orientation': temp_df['orientation'].iloc[j],
+                            'timeframe': temp_df['timeframe'].iloc[j],
+                            'lookback_list': [x],
+                            'threshold_list': [y],
+                            'title': temp_df['title'].iloc[j],
                         }
+                        result = BacktestEngine.performance_evaluation(parameters)
+                        tasks.append((backtest_df, indicator, result, x, y))
                     pass
+            num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
+            with mp.Pool(processes=num_cores) as pool:
+                cv_results = pool.starmap(BacktestEngine.perform_cross_validation, tasks)
         Utilities.generate_heatmap(all_results, True)

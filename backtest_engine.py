@@ -315,7 +315,12 @@ class BacktestEngine:
                         'benchmark_sharpe': benchmark_sharpe,
                         'pos_count': pos_count,
                         'trade_count': trades,
-                        'win_rate': win_rate, }
+                        'win_rate': win_rate,
+                        'indicator': indicator,
+                        'orientation': orientation,
+                        'action': action,
+                        'timeframe': timeframe,
+                        'title': title,}
                     result_list.append(result)
                     if sharpe >= 1:
                         save_result = True
@@ -328,11 +333,10 @@ class BacktestEngine:
                 # })
             if save_result is True:
                 return {
-                    'since': df.index[0],
-                    'end': df.index[-1],
-                    'title': title,
-                    'result': result_list,
                     'data_quantity': len(df),
+                    'end': df.index[-1],
+                    'result': result_list,
+                    'since': df.index[0],
                 }
 
         result = strategy_effectiveness(**backtest_combos)
@@ -390,30 +394,30 @@ class BacktestEngine:
             dict: Combined result with original metrics and cross-validation MSE scores.
         """
 
-        def prepare_features(df, indicator, lookback):
+        def prepare_features(df, indicator, x):
             df = df.copy()
 
             if indicator == 'bband':
-                df['rolling_mean'] = df['factor'].rolling(lookback).mean()
-                df['rolling_std'] = df['factor'].rolling(lookback).std()
+                df['rolling_mean'] = df['factor'].rolling(x).mean()
+                df['rolling_std'] = df['factor'].rolling(x).std()
                 df['upper_band'] = df['rolling_mean'] + 2 * df['rolling_std']
                 df['lower_band'] = df['rolling_mean'] - 2 * df['rolling_std']
-                features = df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[lookback:]
+                features = df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
 
             elif indicator == 'rsi':
                 delta = df['price'].diff()
                 gain = delta.clip(lower=0)
                 loss = -delta.clip(upper=0)
-                avg_gain = gain.rolling(lookback).mean()
-                avg_loss = loss.rolling(lookback).mean()
+                avg_gain = gain.rolling(x).mean()
+                avg_loss = loss.rolling(x).mean()
                 rs = avg_gain / avg_loss
                 df['rsi'] = 100 - (100 / (1 + rs))
-                features = df[['price', 'rsi', 'z']].iloc[lookback:]
+                features = df[['price', 'rsi', 'z']].iloc[x:]
 
             else:
                 raise ValueError(f"Unsupported indicator: {indicator}")
 
-            target = df['cumu'].iloc[lookback:]
+            target = df['cumu'].iloc[x:]
             return features, target
 
         def time_series_cv(model, features, target, n_splits=5):
