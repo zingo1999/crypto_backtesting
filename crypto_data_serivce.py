@@ -6,6 +6,7 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 from glassnode_data_service import GlassnodeDataService
 from utilities import Utilities
 
+
 class CryptoDataService:
 
 
@@ -124,7 +125,7 @@ class CryptoDataService:
                         if backtest_df.empty:
                             continue
                         print(f"{backtest_df.tail(1)}\n")
-                        all_lookback_lists = Utilities.generate_lookback_lists(backtest_df.copy())
+                        lookback_list = Utilities.generate_lookback_lists(backtest_df.copy())
                         backtest_combos = []
                         for indicator in self.indicator_list:
 
@@ -134,13 +135,13 @@ class CryptoDataService:
                             for orientation in self.orientation_list:
                                 for action in self.action_list:
                                     para_combination = {
-                                        'all_lookback_lists': all_lookback_lists,
                                         'asset_currency': asset_currency,
                                         'df': backtest_df,
                                         # 'data_source': data_source,
                                         # 'endpoint_path': endpoint_path,
                                         'factor_currency': factor_currency,
                                         'indicator': indicator,
+                                        'lookback_list': lookback_list,
                                         # 'max_recovery_days': max_recovery_days,
                                         # 'minimum_sharpe': minimum_sharpe,
                                         # 'minimum_trades': minimum_trades,
@@ -177,6 +178,8 @@ class CryptoDataService:
                     result_list = []
                     for i in range(len(result_dict)):
                         data = result_dict[i]['result']
+                        for k in range(len(data)):
+                            data[k]['strategy'] = result_dict[i]['title']
                         result_list += data
                     temp_df = pd.DataFrame(result_list)
                     temp_df = temp_df[temp_df['sharpe'] >= 1]

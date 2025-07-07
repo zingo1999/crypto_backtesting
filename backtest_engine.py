@@ -141,7 +141,7 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, all_lookback_lists, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
+        def strategy_effectiveness(action, lookback_list, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
             def compute_position(df, indicator, action, orientation, x, y, **kwargs):
                 strategy = f"{orientation}_{action}"
 
@@ -247,91 +247,97 @@ class BacktestEngine:
                 return df
 
             save_result = False
-            all_results = []
-            for lookback_list in all_lookback_lists:
-                result_list = []
-                for x in lookback_list:
-                    for y in threshold_list:
-                        parameters = {
-                            'df': df.copy(),
-                            'indicator': indicator,
-                            'orientation': orientation,
-                            'action': action,
-                            'timeframe': timeframe,
-                            'x': x,
-                            'y': y,
-                        }
-                        df = compute_position(**parameters)
-                        df['pos_count'] = (df['pos'] != 0).cumsum()
-                        df['trade'] = (df['pos'].diff().abs() > 0).astype(int)
-                        df['pnl'] = df['pos'].shift(1) * df['chg'] - df['trade'] * 0.06 / 100
-                        df['cumu'] = df['pnl'].cumsum()
-                        df['cummax'] = df['cumu'].cummax()
-                        df['dd'] = df['cummax'] - df['cumu']
-                        df['benchmark'] = df['chg']
-                        df.iloc[0:x - 1, df.columns.get_loc('benchmark')] = 0
-                        df['benchmark_cumu'] = df['benchmark'].cumsum()
-                        df['trade_outcome'] = np.where(df['pnl'] > 0, 1, np.where(df['pnl'] < 0, -1, 0))
+            # all_results = []
+            # for lookback_list in all_lookback_lists:
+            result_list = []
+            for x in lookback_list:
+                for y in threshold_list:
+                    parameters = {
+                        'df': df.copy(),
+                        'indicator': indicator,
+                        'orientation': orientation,
+                        'action': action,
+                        'timeframe': timeframe,
+                        'x': x,
+                        'y': y,
+                    }
+                    df = compute_position(**parameters)
+                    df['pos_count'] = (df['pos'] != 0).cumsum()
+                    df['trade'] = (df['pos'].diff().abs() > 0).astype(int)
+                    df['pnl'] = df['pos'].shift(1) * df['chg'] - df['trade'] * 0.06 / 100
+                    df['cumu'] = df['pnl'].cumsum()
+                    df['cummax'] = df['cumu'].cummax()
+                    df['dd'] = df['cummax'] - df['cumu']
+                    df['benchmark'] = df['chg']
+                    df.iloc[0:x - 1, df.columns.get_loc('benchmark')] = 0
+                    df['benchmark_cumu'] = df['benchmark'].cumsum()
+                    df['trade_outcome'] = np.where(df['pnl'] > 0, 1, np.where(df['pnl'] < 0, -1, 0))
 
-                        pos_count = round(df['pos_count'].iloc[-1] / len(df), 3)
-                        trades = (df['pos'].diff().abs() > 0).sum()
+                    pos_count = round(df['pos_count'].iloc[-1] / len(df), 3)
+                    trades = (df['pos'].diff().abs() > 0).sum()
 
-                        drawdown_periods = np.cumsum(np.where(df['cummax'].ne(df['cummax'].shift()), 1, 0))
-                        max_drawdown_duration = (df.groupby(drawdown_periods)['cummax'].transform('count') - 1).max()
-                        max_drawdown_days = round(max_drawdown_duration * cls.TIMEFRAME_DAYS_MAP[timeframe], 1)
+                    drawdown_periods = np.cumsum(np.where(df['cummax'].ne(df['cummax'].shift()), 1, 0))
+                    max_drawdown_duration = (df.groupby(drawdown_periods)['cummax'].transform('count') - 1).max()
+                    max_drawdown_days = round(max_drawdown_duration * cls.TIMEFRAME_DAYS_MAP[timeframe], 1)
 
-                        total_wins = (df['trade_outcome'] == 1).sum()
-                        total_losses = (df['trade_outcome'] == -1).sum()
-                        win_rate = (total_wins / (total_wins + total_losses)) if (total_wins + total_losses) > 0 else 0
+                    total_wins = (df['trade_outcome'] == 1).sum()
+                    total_losses = (df['trade_outcome'] == -1).sum()
+                    win_rate = (total_wins / (total_wins + total_losses)) if (total_wins + total_losses) > 0 else 0
 
-                        timeunit = cls.TIMEFRAME_TIMEUNIT_MAP[parameters['timeframe']]
-                        cumu = round(df['cumu'].iloc[-1], 3)
-                        mdd = round(df['dd'].max(), 2)
+                    timeunit = cls.TIMEFRAME_TIMEUNIT_MAP[parameters['timeframe']]
+                    cumu = round(df['cumu'].iloc[-1], 3)
+                    mdd = round(df['dd'].max(), 2)
 
-                        annual_return = round(df['pnl'].iloc[x - 1:].mean() * timeunit, 3)
-                        avg_return = df['pnl'].iloc[x - 1:].mean()
-                        return_sd = df['pnl'].iloc[x - 1:].std()
-                        sharpe = round(avg_return / return_sd * np.sqrt(timeunit), 2) if annual_return and return_sd else 0
-                        calmar = round(avg_return * timeunit / mdd, 2) if mdd != 0 else 0
+                    annual_return = round(df['pnl'].iloc[x - 1:].mean() * timeunit, 3)
+                    avg_return = df['pnl'].iloc[x - 1:].mean()
+                    return_sd = df['pnl'].iloc[x - 1:].std()
+                    sharpe = round(avg_return / return_sd * np.sqrt(timeunit), 2) if annual_return and return_sd else 0
+                    calmar = round(avg_return * timeunit / mdd, 2) if mdd != 0 else 0
 
-                        benchmark_mean = df['benchmark'].iloc[x - 1:].mean()
-                        benchmark_std = df['benchmark'].iloc[x - 1:].std()
-                        benchmark_sharpe = round(benchmark_mean / benchmark_std * np.sqrt(timeunit), 2) if benchmark_mean and benchmark_std else 0
+                    benchmark_mean = df['benchmark'].iloc[x - 1:].mean()
+                    benchmark_std = df['benchmark'].iloc[x - 1:].std()
+                    benchmark_sharpe = round(benchmark_mean / benchmark_std * np.sqrt(timeunit), 2) if benchmark_mean and benchmark_std else 0
 
-                        if win_rate >= 0.75: print(f"{parameters['indicator']}_{parameters['orientation']}_{x}_{y} - win rate {round(win_rate * 100, 3)}%")
+                    if win_rate >= 0.75: print(f"{parameters['indicator']}_{parameters['orientation']}_{x}_{y} - win rate {round(win_rate * 100, 3)}%")
 
-                        if isinstance(y, float) and 'e' in f"{y}": y = f"{y:.10f}".rstrip('0')
+                    if isinstance(y, float) and 'e' in f"{y}": y = f"{y:.10f}".rstrip('0')
 
-                        result = {
-                            'x': x,
-                            'y': y,
-                            'sharpe': sharpe,
-                            'mdd': mdd,
-                            'calmar': calmar,
-                            'max_drawdown_days': max_drawdown_days,
-                            'cumu': cumu,
-                            'trades': trades,
-                            'annual_return': annual_return,
-                            'benchmark_sharpe': benchmark_sharpe,
-                            'pos_count': pos_count,
-                            'trade_count': trades,
-                            'win_rate': win_rate, }
-                        result_list.append(result)
-                        if sharpe >= 1:
-                            save_result = True
-                all_results.append({
+                    result = {
+                        'x': x,
+                        'y': y,
+                        'sharpe': sharpe,
+                        'mdd': mdd,
+                        'calmar': calmar,
+                        'max_drawdown_days': max_drawdown_days,
+                        'cumu': cumu,
+                        'trades': trades,
+                        'annual_return': annual_return,
+                        'benchmark_sharpe': benchmark_sharpe,
+                        'pos_count': pos_count,
+                        'trade_count': trades,
+                        'win_rate': win_rate, }
+                    result_list.append(result)
+                    if sharpe >= 1:
+                        save_result = True
+                # all_results.append({
+                #     'since': df.index[0],
+                #     'end': df.index[-1],
+                #     'title': title,
+                #     'result': result_list,
+                #     'data_quantity': len(df),
+                # })
+            if save_result is True:
+                return {
                     'since': df.index[0],
                     'end': df.index[-1],
                     'title': title,
                     'result': result_list,
                     'data_quantity': len(df),
-                })
-            if save_result is True:
-                return all_results
+                }
 
         result = strategy_effectiveness(**backtest_combos)
         if result:
-            return result
+            return [result]
         # return {
         #     'x': x,
         #     'y': y,

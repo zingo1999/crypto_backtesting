@@ -75,58 +75,71 @@ class Utilities:
             max_lookback = min(len(df) // 10, max_3_months_lookback)
         if lookback_step is None: lookback_step = 5
 
-        all_lookback_list = []
-        current_lookback_list = []
-        list_count = 1
-        last_lookback = 2
-
-        ###
-
-        current_lookback_list = []
-        j = 0
-        while True:
-            value = math.ceil(last_lookback * (1.08 ** j))
-
-            if current_lookback_list and value <= current_lookback_list[-1]: value = current_lookback_list[-1] + 3
-
-            if value > max_lookback and len(current_lookback_list) == 25:
-                all_lookback_list.append(current_lookback_list)
-                break
-            elif len(current_lookback_list) == 25:
-                all_lookback_list.append(current_lookback_list)
-                # current_lookback_list = [current_lookback_list[-1], value]
-                current_lookback_list = [value]
-            else:
-                current_lookback_list.append(value)
-            j += 1
-
-        ###
-
-        # for i in range(first_step, max_lookback + 1, lookback_step):
-        #     if list_count < 3 and len(current_lookback_list) < 50:
-        #         current_lookback_list.append(i)
-        #     elif list_count < 3 and len(current_lookback_list) == 50:
+        # all_lookback_list = []
+        # current_lookback_list = []
+        # list_count = 1
+        # last_lookback = 2
+        #
+        # ###
+        #
+        # current_lookback_list = []
+        # j = 0
+        # while True:
+        #     value = math.ceil(last_lookback * (1.08 ** j))
+        #
+        #     if current_lookback_list and value <= current_lookback_list[-1]: value = current_lookback_list[-1] + 3
+        #
+        #     if value > max_lookback and len(current_lookback_list) == 25:
         #         all_lookback_list.append(current_lookback_list)
-        #         last_lookback = current_lookback_list[-1] + 5
-        #         list_count += 1
-        #         current_lookback_list = [i]
-        #     else:
-        #         current_lookback_list = []
-        #         j = 0
-        #         while True:
-        #             value = math.ceil(last_lookback * (1.035 ** j))
-        #             if value > max_lookback and len(current_lookback_list) == 25:
-        #                 all_lookback_list.append(current_lookback_list)
-        #                 break
-        #             elif len(current_lookback_list) == 25:
-        #                 all_lookback_list.append(current_lookback_list)
-        #                 current_lookback_list = [current_lookback_list[-1], value]
-        #             else: current_lookback_list.append(value)
-        #             j += 1
         #         break
-        if len(all_lookback_list) > 1 and len(all_lookback_list) % 2 == 1:
-            return all_lookback_list[:-1]
-        return all_lookback_list
+        #     elif len(current_lookback_list) == 25:
+        #         all_lookback_list.append(current_lookback_list)
+        #         # current_lookback_list = [current_lookback_list[-1], value]
+        #         current_lookback_list = [value]
+        #     else:
+        #         current_lookback_list.append(value)
+        #     j += 1
+        #
+        # ###
+        #
+        # # for i in range(first_step, max_lookback + 1, lookback_step):
+        # #     if list_count < 3 and len(current_lookback_list) < 50:
+        # #         current_lookback_list.append(i)
+        # #     elif list_count < 3 and len(current_lookback_list) == 50:
+        # #         all_lookback_list.append(current_lookback_list)
+        # #         last_lookback = current_lookback_list[-1] + 5
+        # #         list_count += 1
+        # #         current_lookback_list = [i]
+        # #     else:
+        # #         current_lookback_list = []
+        # #         j = 0
+        # #         while True:
+        # #             value = math.ceil(last_lookback * (1.035 ** j))
+        # #             if value > max_lookback and len(current_lookback_list) == 25:
+        # #                 all_lookback_list.append(current_lookback_list)
+        # #                 break
+        # #             elif len(current_lookback_list) == 25:
+        # #                 all_lookback_list.append(current_lookback_list)
+        # #                 current_lookback_list = [current_lookback_list[-1], value]
+        # #             else: current_lookback_list.append(value)
+        # #             j += 1
+        # #         break
+        # if len(all_lookback_list) > 1 and len(all_lookback_list) % 2 == 1:
+        #     return all_lookback_list[:-1]
+        # return all_lookback_list
+
+        lookback_list = [
+            2, 3, 8, 11, 14, 18, 22, 26, 30, 35, 40, 45, 50,
+            *[int(x) for x in np.arange(55, 105, 5)],
+            *[int(x) for x in np.arange(110, 301, 10)]
+        ]
+
+        current_value = lookback_list[-1] + 15
+        while current_value <= max_lookback:
+            lookback_list.append(current_value)
+            current_value = int(current_value * 1.035)
+        lookback_list = lookback_list[:100] if len(lookback_list) > 100 else lookback_list
+        return lookback_list
 
 
     @classmethod
