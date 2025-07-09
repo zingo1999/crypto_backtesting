@@ -124,22 +124,20 @@ class CryptoDataService:
                         backtest_df = CryptoDataService(self.kwargs).create_backtest_df(price_df.copy())
                         if backtest_df.empty:
                             continue
-                        print(f"{backtest_df.tail(1)}\n")
+                        print(f"{backtest_df.tail(2)}\n")
                         lookback_list = Utilities.generate_lookback_lists(backtest_df.copy())
                         backtest_combos = []
                         for indicator in self.indicator_list:
-
                             threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator, self.max_threshold, self.number_of_interval)
-                            # if indicator == 'roc': threshold_list = all_lookback_lists[0][:15]
-                            # else: threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator)
                             for orientation in self.orientation_list:
                                 for action in self.action_list:
                                     para_combination = {
                                         'action': action,
                                         'asset_currency': asset_currency,
-                                        'df': backtest_df,
+                                        'backtest_df': backtest_df,
                                         # 'data_source': data_source,
                                         # 'endpoint_path': endpoint_path,
+                                        'endpoint': endpoint,
                                         'factor_currency': factor_currency,
                                         'indicator': indicator,
                                         'lookback_list': lookback_list,
@@ -157,53 +155,70 @@ class CryptoDataService:
                         if len(backtest_combos) > 1:
                             num_cores = max(1, min(len(backtest_combos), mp.cpu_count() - 2))
                             pool = mp.Pool(processes=num_cores)
-                            # backtest_results = pool.map(Utilities.alpha_engine, backtest_combos)
                             backtest_results = pool.map(BacktestEngine.performance_evaluation, backtest_combos)
                             pool.close()
                         else:
-                            # backtest_results = [Utilities.alpha_engine(backtest_combos[0])]
                             backtest_results = [BacktestEngine.performance_evaluation(backtest_combos[0])]
 
-                        if backtest_results:
+                        if any(element is not None for element in backtest_results):
                             backtest_results = [result for result in backtest_results if result is not None]
                             all_results.append(backtest_results)
 
 
-                        # if any(element is not None for element in backtest_results):
-                        #     all_results.append(backtest_results)
-
-
         if self.cross_validate is True:
-            tasks = []
+            result_list = []
             for group_currency in all_results:
-                for result_dict in group_currency:
-                    result_list = []
-                    for i in range(len(result_dict)):
-                        data = result_dict[i]['result']
-                        # for k in range(len(data)):
-                        #     data[k]['strategy'] = result_dict[i]['strategy']
-                        result_list += data
-                    temp_df = pd.DataFrame(result_list)
-                    temp_df = temp_df[temp_df['sharpe'] >= 1]
-                    temp_df = temp_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
-                    for j in range(len(temp_df)):
-                        indicator = temp_df['indicator'].iloc[j]
-                        x = temp_df['x'].iloc[j]
-                        y = temp_df['y'].iloc[j]
-                        parameters = {
-                            'action': temp_df['action'].iloc[j],
-                            'df': backtest_df,
-                            'indicator': indicator,
-                            'orientation': temp_df['orientation'].iloc[j],
-                            'timeframe': temp_df['timeframe'].iloc[j],
-                            'lookback_list': [x],
-                            'threshold_list': [y],
-                            'title': temp_df['title'].iloc[j],
-                        }
-                        result = BacktestEngine.performance_evaluation(parameters)
-                        tasks.append((backtest_df, indicator, result, x, y))
-                    pass
-            num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
-            with mp.Pool(processes=num_cores) as pool:
-                cv_results = pool.starmap(BacktestEngine.perform_cross_validation, tasks)
+                for i in range(len(group_currency)):
+                    data = group_currency[i]['result']
+                    result_list += data
+            temp_df = pd.DataFrame(result_list)
+            temp_df = temp_df[temp_df['sharpe'] >= 1]
+            temp_df = temp_df.sort_values(by='asset_currency').reset_index(drop=True)
+
+            unique_combinations = temp_df[['factor_currency', 'asset_currency', 'timeframe', 'endpoint']].drop_duplicates()
+            dict_list = unique_combinations.to_dict(orient='records')
+
+            backtest_df_list = {}
+            for b in dict_list:
+                asset_currency = b['asset_currency']
+                factor_currency = b['factor_currency']
+                endpoint = b['endpoint']
+                timeframe = b['timeframe']
+                data = self.kwargs
+                data.update({
+                    'asset_currency': asset_currency,
+                    'factor_currency': factor_currency,
+                    'timeframe': timeframe,
+                    'endpoint': endpoint,
+                })
+                price_df = CryptoExchangeDataService(asset_currency, **data).get_historical_data(True)
+                backtest_df = CryptoDataService(data).create_backtest_df(price_df)
+                backtest_df_list.update({f"{factor_currency}_{asset_currency}_{timeframe}_{endpoint}": backtest_df})
+
+            tasks = []
+            for j in range(len(temp_df)):
+                data = temp_df.iloc[j].to_dict()
+                # asset_currency = data['asset_currency']
+                # factor_currency = data['factor_currency']
+                # timeframe = data['timeframe']
+                # endpoint = data['endpoint']
+                data.update({
+                    'backtest_df': backtest_df_list.get(f"{data['factor_currency']}_{data['asset_currency']}_{data['timeframe']}_{data['endpoint']}").copy(),
+                    'lookback_list': [int(data['x'])],
+                    'threshold_list': [float(data['y'])],
+                })
+                result = BacktestEngine.performance_evaluation(data)
+                data.update({'backtest_result': result,})
+                tasks.append(data)
+
+            if len(tasks) > 1:
+                num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
+                pool = mp.Pool(processes=num_cores)
+                cv_results = pool.map(BacktestEngine.perform_cross_validation, tasks)
+                pool.close()
+            else:
+                cv_results = [BacktestEngine.perform_cross_validation(tasks[0])]
+            cv_df = pd.DataFrame(cv_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+            pass
+
         Utilities.generate_heatmap(all_results, True)

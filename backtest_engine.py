@@ -140,112 +140,117 @@ class BacktestEngine:
     #         return all_results
 
     @classmethod
+    def compute_position(cls, df, indicator, action, orientation, x, y, **kwargs):
+        strategy = f"{orientation}_{action}"
+
+        if indicator == 'bband':
+            df['ma'] = df['factor'].rolling(x).mean()
+            df['sd'] = df['factor'].rolling(x).std()
+            df['z'] = (df['factor'] - df['ma']) / df['sd']
+
+            bband_action_map = {
+                'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
+            df['pos'] = bband_action_map[strategy](df['z'])
+
+        elif indicator == 'rsi':
+            delta = df['factor'].diff(1)
+            delta = delta.fillna(0)
+            gain = delta.clip(lower=0)
+            loss = -delta.clip(upper=0)
+            avg_gain = gain.rolling(x).mean()
+            avg_loss = loss.rolling(x).mean()
+            rs = avg_gain / avg_loss
+            df['z'] = 100 - (100 / (1 + rs))
+            upper_bond, lower_bond = 50 + y, 50 - y
+            rsi_action_map = {
+                'momentum_long_short': lambda z: np.where(z > upper_bond, 1, np.where(z < lower_bond, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > upper_bond, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < lower_bond, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > upper_bond, -1, np.where(z < lower_bond, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < lower_bond, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > upper_bond, -1, 0), }
+            df['pos'] = rsi_action_map[strategy](df['z'])
+
+        elif indicator == 'percentile_rank':
+
+            df['z'] = df['factor'].rank(pct=True)
+            df['pos'] = np.where(df['z'] > y, 1, np.where(df['z'] < y, -1, 0))
+            pass
+
+        elif indicator == 'ma_diff':
+            df['ma'] = df['factor'].rolling(x).mean()
+            df['z'] = df['factor'] / df['ma'] - 1
+
+            ma_diff_action_map = {
+                'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
+            df['pos'] = ma_diff_action_map[strategy](df['z'])
+
+        elif indicator == 'ma':
+            df['ma'] = df['factor'].rolling(x).mean()
+            df['z'] = (df['factor'] - df['ma']) / df['factor']
+
+        elif indicator == 'roc':
+
+            df['z'] = df['factor'].pct_change(periods=x) * 100
+
+            roc_action_map = {
+                'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
+            df['pos'] = roc_action_map[strategy](df['z'])
+
+        elif indicator == 'ma_roc':
+
+            df['ma'] = df['factor'].rolling(x).mean()
+            df['z'] = df['ma'].pct_change(periods=1) * 100
+
+            ma_roc_action_map = {
+                'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
+            df['pos'] = ma_roc_action_map[strategy](df['z'])
+
+            pass
+
+        elif indicator == 'cross_ma':
+
+            df['fast_ma'] = df['factor'].rolling(x).mean()
+            df['slow_ma'] = df['factor'].rolling(int(y)).mean()
+
+            cross_ma_action_dict = {
+                'momentum_long_short': np.where(df['fast_ma'] > df['slow_ma'],
+                                                1,
+                                                np.where(df['fast_ma'] < df['slow_ma'], -1, 0)),
+                'momentum_long_only': np.where(df['fast_ma'] > df['slow_ma'], 1, 0),
+                'momentum_short_only': np.where(df['fast_ma'] < df['slow_ma'], -1, 0),
+                'reversion_long_short': np.where(df['fast_ma'] > df['slow_ma'],
+                                                 -1,
+                                                 np.where(df['fast_ma'] < df['slow_ma'], 1, 0)),
+                'reversion_long_only': np.where(df['fast_ma'] > df['slow_ma'], -1, 0),
+                'reversion_short_only': np.where(df['fast_ma'] < df['slow_ma'], 1, 0), }
+            df['pos'] = cross_ma_action_dict[strategy]
+
+        return df
+
+    @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, lookback_list, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
-            def compute_position(df, indicator, action, orientation, x, y, **kwargs):
-                strategy = f"{orientation}_{action}"
-
-                if indicator == 'bband':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['sd'] = df['factor'].rolling(x).std()
-                    df['z'] = (df['factor'] - df['ma']) / df['sd']
-
-                    bband_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
-                    df['pos'] = bband_action_map[strategy](df['z'])
-
-                elif indicator == 'rsi':
-                    df['delta'] = df['factor'].diff(1)
-                    df['delta'] = df['delta'].astype(float).fillna(0)
-                    df['positive'] = df['delta'].clip(lower=0)
-                    df['negative'] = df['delta'].clip(upper=0)
-                    df['average_gain'] = df['positive'].rolling(x).mean()
-                    df['average_loss'] = abs(df['negative'].rolling(x).mean())
-                    df['relative_strength'] = df['average_gain'] / df['average_loss']
-                    df['z'] = 100 - (100 / (1 + df['relative_strength']))
-                    upper_bond, lower_bond = 50 + y, 50 - y
-                    rsi_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > upper_bond, 1, np.where(z < lower_bond, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > upper_bond, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < lower_bond, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > upper_bond, -1, np.where(z < lower_bond, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < lower_bond, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > upper_bond, -1, 0), }
-                    df['pos'] = rsi_action_map[strategy](df['z'])
-
-                elif indicator == 'percentile_rank':
-
-                    df['z'] = df['factor'].rank(pct=True)
-                    df['pos'] = np.where(df['z'] > y, 1, np.where(df['z'] < y, -1, 0))
-                    pass
-
-                elif indicator == 'ma_diff':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = df['factor'] / df['ma'] - 1
-
-                    ma_diff_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
-                    df['pos'] = ma_diff_action_map[strategy](df['z'])
-
-                elif indicator == 'ma':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = (df['factor'] - df['ma']) / df['factor']
-
-                elif indicator == 'roc':
-
-                    df['z'] = df['factor'].pct_change(periods=x) * 100
-
-                    roc_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
-                    df['pos'] = roc_action_map[strategy](df['z'])
-
-                elif indicator == 'ma_roc':
-
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = df['ma'].pct_change(periods=1) * 100
-
-                    ma_roc_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
-                    df['pos'] = ma_roc_action_map[strategy](df['z'])
-
-                    pass
-
-                elif indicator == 'cross_ma':
-
-                    df['fast_ma'] = df['factor'].rolling(x).mean()
-                    df['slow_ma'] = df['factor'].rolling(int(y)).mean()
-
-                    cross_ma_action_dict = {
-                        'momentum_long_short': np.where(df['fast_ma'] > df['slow_ma'], 1, np.where(df['fast_ma'] < df['slow_ma'], -1, 0)),
-                        'momentum_long_only': np.where(df['fast_ma'] > df['slow_ma'], 1, 0),
-                        'momentum_short_only': np.where(df['fast_ma'] < df['slow_ma'], -1, 0),
-                        'reversion_long_short': np.where(df['fast_ma'] > df['slow_ma'], -1, np.where(df['fast_ma'] < df['slow_ma'], 1, 0)),
-                        'reversion_long_only': np.where(df['fast_ma'] > df['slow_ma'], -1, 0),
-                        'reversion_short_only': np.where(df['fast_ma'] < df['slow_ma'], 1, 0), }
-                    df['pos'] = cross_ma_action_dict[strategy]
-
-                return df
-
+        def strategy_effectiveness(action, asset_currency, backtest_df, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, title, **kwargs):
             save_result = False
             # all_results = []
             # for lookback_list in all_lookback_lists:
@@ -253,7 +258,7 @@ class BacktestEngine:
             for x in lookback_list:
                 for y in threshold_list:
                     parameters = {
-                        'df': df.copy(),
+                        'df': backtest_df.copy(),
                         'indicator': indicator,
                         'orientation': orientation,
                         'action': action,
@@ -261,7 +266,7 @@ class BacktestEngine:
                         'x': x,
                         'y': y,
                     }
-                    df = compute_position(**parameters)
+                    df = cls.compute_position(**parameters)
                     df['pos_count'] = (df['pos'] != 0).cumsum()
                     df['trade'] = (df['pos'].diff().abs() > 0).astype(int)
                     df['pnl'] = df['pos'].shift(1) * df['chg'] - df['trade'] * 0.06 / 100
@@ -316,10 +321,13 @@ class BacktestEngine:
                         'pos_count': pos_count,
                         'trade_count': trades,
                         'win_rate': win_rate,
+                        'factor_currency': factor_currency,
+                        'asset_currency': asset_currency,
                         'indicator': indicator,
                         'orientation': orientation,
                         'action': action,
                         'timeframe': timeframe,
+                        'endpoint': endpoint,
                         'title': title,}
                     result_list.append(result)
                     if sharpe >= 1:
@@ -341,7 +349,7 @@ class BacktestEngine:
 
         result = strategy_effectiveness(**backtest_combos)
         if result:
-            return [result]
+            return result
         # return {
         #     'x': x,
         #     'y': y,
@@ -379,7 +387,7 @@ class BacktestEngine:
         #     print(cv_df.head())
 
     @classmethod
-    def perform_cross_validation(cls, backtest_df, indicator, result, x, y, **kwargs):
+    def perform_cross_validation(cls, task, **kwargs):
         """
         Perform time series cross-validation using a specified technical indicator.
 
@@ -394,30 +402,44 @@ class BacktestEngine:
             dict: Combined result with original metrics and cross-validation MSE scores.
         """
 
-        def prepare_features(df, indicator, x):
-            df = df.copy()
-
+        def prepare_features(action, backtest_df, indicator, orientation, x, y, **kwargs):
+            kwargs = {
+                'action': action,
+                'indicator': indicator,
+                'orientation': orientation,
+                'x': x,
+                'y': y,
+            }
             if indicator == 'bband':
-                df['rolling_mean'] = df['factor'].rolling(x).mean()
-                df['rolling_std'] = df['factor'].rolling(x).std()
-                df['upper_band'] = df['rolling_mean'] + 2 * df['rolling_std']
-                df['lower_band'] = df['rolling_mean'] - 2 * df['rolling_std']
-                features = df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
+                backtest_df['ma'] = backtest_df['factor'].rolling(x).mean()
+                backtest_df['sd'] = backtest_df['factor'].rolling(x).std()
+                backtest_df['z'] = (backtest_df['factor'] - backtest_df['ma']) / backtest_df['sd']
+                backtest_df['upper_band'] = backtest_df['ma'] + 2 * backtest_df['sd']
+                backtest_df['lower_band'] = backtest_df['ma'] - 2 * backtest_df['sd']
+                kwargs.update({'df': backtest_df})
+                backtest_df = cls.compute_position(**kwargs)
+                features = backtest_df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
 
             elif indicator == 'rsi':
-                delta = df['price'].diff()
+                delta = backtest_df['factor'].diff(1)
+                delta = delta.fillna(0)
                 gain = delta.clip(lower=0)
                 loss = -delta.clip(upper=0)
                 avg_gain = gain.rolling(x).mean()
                 avg_loss = loss.rolling(x).mean()
                 rs = avg_gain / avg_loss
-                df['rsi'] = 100 - (100 / (1 + rs))
-                features = df[['price', 'rsi', 'z']].iloc[x:]
+                backtest_df['rsi'] = 100 - (100 / (1 + rs))
+                kwargs.update({'df': backtest_df})
+                backtest_df = cls.compute_position(**kwargs)
+                features = backtest_df[['price', 'rsi', 'z']].iloc[x:]
 
             else:
                 raise ValueError(f"Unsupported indicator: {indicator}")
 
-            target = df['cumu'].iloc[x:]
+            backtest_df['trade'] = (backtest_df['pos'].diff().abs() > 0).astype(int)
+            backtest_df['pnl'] = backtest_df['pos'].shift(1) * backtest_df['chg'] - backtest_df['trade'] * 0.06 / 100
+            backtest_df['cumu'] = backtest_df['pnl'].cumsum()
+            target = backtest_df['cumu'].iloc[x:]
             return features, target
 
         def time_series_cv(model, features, target, n_splits=5):
@@ -435,8 +457,8 @@ class BacktestEngine:
 
             return np.mean(mse_scores)
 
-        def cross_validate_result(df, indicator, lookback):
-            features, target = prepare_features(df, indicator, lookback)
+        def cross_validate_result(task):
+            features, target = prepare_features(**task)
 
             models = {
                 'RandomForest': RandomForestRegressor(
@@ -456,12 +478,22 @@ class BacktestEngine:
 
             return results
 
-        combined_result = {'x': x, 'y': y, **result}
-        cv_scores = cross_validate_result(backtest_df, indicator, x)
+        combined_result = {
+            'x': task['x'],
+            'y': task['y'],
+            'sharpe': task['backtest_result']['result'][0]['sharpe'],
+        }
+        cv_scores = cross_validate_result(task)
 
         for model_name, metrics in cv_scores.items():
             combined_result[f'{model_name}_mean_mse'] = metrics['mean_mse']
 
+        combined_result.update({
+            'factor_currency': task['factor_currency'],
+            'asset_currency': task['asset_currency'],
+            'timeframe': task['timeframe'],
+            'endpoint': task['endpoint'],
+        })
         return combined_result
 
 
