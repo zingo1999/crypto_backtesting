@@ -345,12 +345,7 @@ class BacktestEngine:
 
             if save_result is True:
                 return {action: result_list}
-                # return {
-                #     'data_quantity': len(df),
-                #     'end': df.index[-1],
-                #     'result': result_list,
-                #     'since': df.index[0],
-                # }
+
 
         result = strategy_effectiveness(**backtest_combos)
         if result:
