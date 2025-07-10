@@ -355,41 +355,7 @@ class BacktestEngine:
         result = strategy_effectiveness(**backtest_combos)
         if result:
             return result
-        # return {
-        #     'x': x,
-        #     'y': y,
-        #     'sharpe': sharpe,
-        #     'mdd': mdd,
-        #     'calmar': calmar,
-        #     'benchmark_sharpe': benchmark_sharpe,
-        #     'total_return': cumu,
-        #     'volatility': return_sd
-        # }
 
-        # if cross_validate:
-        #     tasks = []
-        #     for lookback_list in all_lookback_lists:
-        #         for x in lookback_list:
-        #             for y in threshold_list:
-        #                 backtest_df = df.copy()
-        #                 parameters = {
-        #                     'df': backtest_df,
-        #                     'indicator': indicator,
-        #                     'orientation': orientation,
-        #                     'action': action,
-        #                     'timeframe': timeframe,
-        #                     'x': x,
-        #                     'y': y,
-        #                 }
-        #                 result = cls.performance_evaluation(parameters, x, y)
-        #                 tasks.append((backtest_df, indicator, result, x, y))
-        #     num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
-        #     with mp.Pool(processes=num_cores) as pool:
-        #         cv_results = pool.starmap(cls.perform_cross_validation, tasks)
-        #
-        # if cv_results:
-        #     cv_df = pd.DataFrame(cv_results).sort_values('sharpe', ascending=False).reset_index(drop=True)
-        #     print(cv_df.head())
 
     @classmethod
     def perform_cross_validation(cls, task, **kwargs):
