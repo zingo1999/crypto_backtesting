@@ -8,18 +8,20 @@ if __name__ == '__main__':
     factor_currency = ''
     asset_currency  = 'btc'
     action          = ''
-    indicator       = 'bband'
+    indicator       = ''
     orientation     = 'momentum'
     since           = '2020-05-01'
     # since           = '2025-06-01'
-    timeframe       = '1d'
+    timeframe       = ''
 
     data_source     = 'glassnode'        # glassnode
-    endpoint        = 'active_1m_3m'       # options_25delta_skew_3_months implied
+    endpoint        = 'options_25delta_skew_3_months'       # active_1m_3m options_25delta_skew_3_months implied
     exchange_name   = 'bybit'
     product_type    = 'linear'
 
     update_mode         = True
+    minimum_sharpe      = 1.2
+
     max_threshold       = 0
     number_of_interval  = 0
 

@@ -250,10 +250,8 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, asset_currency, backtest_df, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, title, **kwargs):
+        def strategy_effectiveness(action, asset_currency, backtest_df, endpoint, factor_currency, indicator, lookback_list, minimum_sharpe, orientation, threshold_list, timeframe, title, **kwargs):
             save_result = False
-            # all_results = []
-            # for lookback_list in all_lookback_lists:
             result_list = []
             for x in lookback_list:
                 for y in threshold_list:
@@ -316,36 +314,43 @@ class BacktestEngine:
                         'max_drawdown_days': max_drawdown_days,
                         'cumu': cumu,
                         'trades': trades,
-                        'annual_return': annual_return,
+                        # 'annual_return': annual_return,
                         'benchmark_sharpe': benchmark_sharpe,
                         'pos_count': pos_count,
-                        'trade_count': trades,
-                        'win_rate': win_rate,
-                        'factor_currency': factor_currency,
-                        'asset_currency': asset_currency,
-                        'indicator': indicator,
-                        'orientation': orientation,
-                        'action': action,
-                        'timeframe': timeframe,
-                        'endpoint': endpoint,
-                        'title': title,}
-                    result_list.append(result)
-                    if sharpe >= 1:
+                        # 'trade_count': trades,
+                        # 'win_rate': win_rate,
+                        # 'factor_currency': factor_currency,
+                        # 'asset_currency': asset_currency,
+                        # 'timeframe': timeframe,
+                        'remarks': f"{factor_currency}/{asset_currency}/{timeframe}/{endpoint.split('/')[-1]}/{indicator}/{orientation}/{action}",
+                    }
+                    result_list.append({
+                            'factor_currency': factor_currency,
+                            'asset_currency': asset_currency,
+                            'indicator': indicator,
+                            'orientation': orientation,
+                            'action': action,
+                            'timeframe': timeframe,
+                            'x': x,
+                            'y': y,
+                            'endpoint': endpoint,
+                            'title': title,
+                            'result': result,
+                            'data_quantity': len(df),
+                            'end': df.index[-1],
+                            'since': df.index[0], })
+
+                    if sharpe >= minimum_sharpe:
                         save_result = True
-                # all_results.append({
-                #     'since': df.index[0],
-                #     'end': df.index[-1],
-                #     'title': title,
-                #     'result': result_list,
-                #     'data_quantity': len(df),
-                # })
+
             if save_result is True:
-                return {
-                    'data_quantity': len(df),
-                    'end': df.index[-1],
-                    'result': result_list,
-                    'since': df.index[0],
-                }
+                return {action: result_list}
+                # return {
+                #     'data_quantity': len(df),
+                #     'end': df.index[-1],
+                #     'result': result_list,
+                #     'since': df.index[0],
+                # }
 
         result = strategy_effectiveness(**backtest_combos)
         if result:

@@ -2,6 +2,7 @@ import pandas as pd
 import multiprocessing as mp
 
 from backtest_engine import BacktestEngine
+from cross_validator import CrossValidator
 from crypto_exchange_data_service import CryptoExchangeDataService
 from glassnode_data_service import GlassnodeDataService
 from utilities import Utilities
@@ -29,6 +30,7 @@ class CryptoDataService:
         self.factor_currency = ''
         self.indicator = ''
         self.max_threshold = ''
+        self.minimum_sharpe = ''
         self.number_of_interval = ''
         self.orientation = ''
         self.timeframe = ''
@@ -108,7 +110,7 @@ class CryptoDataService:
         return backtest_df
 
     def backtest_combinations(self,):
-        all_results = []
+        all_results = {}
         for timeframe in self.timeframe_list:
             for asset_currency in self.asset_currency_list:
                 price_df = CryptoExchangeDataService(asset_currency, **self.kwargs).get_historical_data(True)
@@ -143,7 +145,7 @@ class CryptoDataService:
                                         'lookback_list': lookback_list,
                                         'orientation': orientation,
                                         # 'max_recovery_days': max_recovery_days,
-                                        # 'minimum_sharpe': minimum_sharpe,
+                                        'minimum_sharpe': self.minimum_sharpe,
                                         # 'minimum_trades': minimum_trades,
                                         # 't_plus': t_plus,
                                         'strategy': f"{indicator}_{orientation}_{action}",
@@ -162,24 +164,31 @@ class CryptoDataService:
 
                         if any(element is not None for element in backtest_results):
                             backtest_results = [result for result in backtest_results if result is not None]
-                            all_results.append(backtest_results)
+                            # all_results.append({factor_currency: backtest_results})
+                            all_results.update({factor_currency: backtest_results})
 
 
         if self.cross_validate is True:
             result_list = []
-            for group_currency in all_results:
-                for i in range(len(group_currency)):
-                    data = group_currency[i]['result']
-                    result_list += data
+            factor_currency_list = list(all_results.keys())
+            for factor_currency in factor_currency_list:
+                results = all_results.get(factor_currency)
+                for result in results:
+                    action_list = list(result.keys())
+                    for action in action_list:
+                        temp_data = result.get(action)
+                        for d in range(len(temp_data)):
+                            data = temp_data[d]['result']
+                            result_list.append(data)
             temp_df = pd.DataFrame(result_list)
             temp_df = temp_df[temp_df['sharpe'] >= 1]
-            temp_df = temp_df.sort_values(by='asset_currency').reset_index(drop=True)
+            temp_df = temp_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
 
-            unique_combinations = temp_df[['factor_currency', 'asset_currency', 'timeframe', 'endpoint']].drop_duplicates()
-            dict_list = unique_combinations.to_dict(orient='records')
+            unique_combinations = temp_df[['factor_currency', 'asset_currency', 'timeframe', 'endpoint']].drop_duplicates().to_dict(orient='records')
+            pass
 
             backtest_df_list = {}
-            for b in dict_list:
+            for b in unique_combinations:
                 asset_currency = b['asset_currency']
                 factor_currency = b['factor_currency']
                 endpoint = b['endpoint']
@@ -214,10 +223,10 @@ class CryptoDataService:
             if len(tasks) > 1:
                 num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
                 pool = mp.Pool(processes=num_cores)
-                cv_results = pool.map(BacktestEngine.perform_cross_validation, tasks)
+                cv_results = pool.map(CrossValidator.evaluate_backtest_results, tasks)
                 pool.close()
             else:
-                cv_results = [BacktestEngine.perform_cross_validation(tasks[0])]
+                cv_results = [CrossValidator.evaluate_backtest_results(tasks[0])]
             cv_df = pd.DataFrame(cv_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
             pass
 
