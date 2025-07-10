@@ -183,22 +183,26 @@ class CryptoDataService:
             temp_df = pd.DataFrame(result_list)
             temp_df = temp_df[temp_df['sharpe'] >= 1]
             temp_df = temp_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+            del result_list
 
-            unique_combinations = temp_df[['factor_currency', 'asset_currency', 'timeframe', 'endpoint']].drop_duplicates().to_dict(orient='records')
-            pass
+            unique_combinations = list({'|'.join(item.split('|')[:4]) for item in temp_df['strategy'].unique()})
 
             backtest_df_list = {}
             for b in unique_combinations:
-                asset_currency = b['asset_currency']
-                factor_currency = b['factor_currency']
-                endpoint = b['endpoint']
-                timeframe = b['timeframe']
+
+                factor_currency = b.split('|')[0]
+                asset_currency = b.split('|')[1]
+                timeframe = b.split('|')[2]
+                endpoint = b.split('|')[3]
                 data = self.kwargs
                 data.update({
                     'asset_currency': asset_currency,
                     'factor_currency': factor_currency,
                     'timeframe': timeframe,
                     'endpoint': endpoint,
+                    # 'indicator': b.split('/')[4],
+                    # 'orientation': b.split('/')[5],
+                    # 'action': b.split('/')[6],
                 })
                 price_df = CryptoExchangeDataService(asset_currency, **data).get_historical_data(True)
                 backtest_df = CryptoDataService(data).create_backtest_df(price_df)
@@ -206,15 +210,15 @@ class CryptoDataService:
 
             tasks = []
             for j in range(len(temp_df)):
-                data = temp_df.iloc[j].to_dict()
-                # asset_currency = data['asset_currency']
-                # factor_currency = data['factor_currency']
-                # timeframe = data['timeframe']
-                # endpoint = data['endpoint']
+                data = temp_df['strategy'].iloc[j]
+                factor_currency = data.split('|')[0]
+                asset_currency = data.split('|')[1]
+                timeframe = data.split('|')[2]
+                endpoint = data.split('|')[3]
                 data.update({
-                    'backtest_df': backtest_df_list.get(f"{data['factor_currency']}_{data['asset_currency']}_{data['timeframe']}_{data['endpoint']}").copy(),
-                    'lookback_list': [int(data['x'])],
-                    'threshold_list': [float(data['y'])],
+                    'backtest_df': backtest_df_list.get(f"{factor_currency}_{asset_currency}_{timeframe}_{endpoint}").copy(),
+                    'lookback_list': [int(data.split('|')[-2])],
+                    'threshold_list': [float(data.split('|')[-1])],
                 })
                 result = BacktestEngine.performance_evaluation(data)
                 data.update({'backtest_result': result,})

@@ -9,10 +9,10 @@ if __name__ == '__main__':
     asset_currency  = 'btc'
     action          = ''
     indicator       = ''
-    orientation     = 'momentum'
+    orientation     = ''
     since           = '2020-05-01'
     # since           = '2025-06-01'
-    timeframe       = ''
+    timeframe       = '1h'
 
     data_source     = 'glassnode'        # glassnode
     endpoint        = 'options_25delta_skew_3_months'       # active_1m_3m options_25delta_skew_3_months implied
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     product_type    = 'linear'
 
     update_mode         = True
-    minimum_sharpe      = 1.2
+    minimum_sharpe      = 1
 
     max_threshold       = 0
     number_of_interval  = 0

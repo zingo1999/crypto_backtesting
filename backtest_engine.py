@@ -79,66 +79,6 @@ class BacktestEngine:
     def __init__(self):
         pass
 
-
-    # @classmethod
-    # def strategy_effectiveness(cls, action, all_lookback_lists, df, indicator, orientation, threshold_list, timeframe, title, cross_validate=False, **kwargs):
-    #
-    #     save_result = False
-    #     all_results = []
-    #     cv_results = []
-    #
-    #     for lookback_list in all_lookback_lists:
-    #         results = []
-    #         for x in lookback_list:
-    #             for y in threshold_list:
-    #                 backtest_df = df.copy()
-    #                 parameters = {
-    #                     'df': backtest_df,
-    #                     'indicator': indicator,
-    #                     'orientation': orientation,
-    #                     'action': action,
-    #                     'timeframe': timeframe,
-    #                     'x': x,
-    #                     'y': y, }
-    #                 result = cls.performance_evaluation(parameters, x, y)
-    #                 results.append(result)
-    #
-    #                 if result['sharpe'] >= 1:
-    #                     save_result = True
-    #
-    #         all_results.append({
-    #             'since': df.index[0],
-    #             'end': df.index[-1],
-    #             # 'title': title,
-    #             'result': results,
-    #             'data_quantity': len(df), })
-    #     if cross_validate:
-    #         tasks = []
-    #         for lookback_list in all_lookback_lists:
-    #             for x in lookback_list:
-    #                 for y in threshold_list:
-    #                     backtest_df = df.copy()
-    #                     parameters = {
-    #                         'df': backtest_df,
-    #                         'indicator': indicator,
-    #                         'orientation': orientation,
-    #                         'action': action,
-    #                         'timeframe': timeframe,
-    #                         'x': x,
-    #                         'y': y,
-    #                     }
-    #                     result = cls.performance_evaluation(parameters, x, y)
-    #                     tasks.append((backtest_df, indicator, result, x, y))
-    #         num_cores = max(1, min(len(tasks), mp.cpu_count() - 2))
-    #         with mp.Pool(processes=num_cores) as pool:
-    #             cv_results = pool.starmap(cls.perform_cross_validation, tasks)
-    #
-    #     if cv_results:
-    #         cv_df = pd.DataFrame(cv_results).sort_values('sharpe', ascending=False).reset_index(drop=True)
-    #         print(cv_df.head())
-    #     if save_result is True:
-    #         return all_results
-
     @classmethod
     def compute_position(cls, df, indicator, action, orientation, x, y, **kwargs):
         strategy = f"{orientation}_{action}"
@@ -322,7 +262,8 @@ class BacktestEngine:
                         # 'factor_currency': factor_currency,
                         # 'asset_currency': asset_currency,
                         # 'timeframe': timeframe,
-                        'remarks': f"{factor_currency}/{asset_currency}/{timeframe}/{endpoint.split('/')[-1]}/{indicator}/{orientation}/{action}",
+                        'strategy': f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}|{indicator}|{orientation}|{action}|{x}|{y}",
+                        # 'endpoint': endpoint,
                     }
                     result_list.append({
                             'factor_currency': factor_currency,
@@ -350,7 +291,6 @@ class BacktestEngine:
         result = strategy_effectiveness(**backtest_combos)
         if result:
             return result
-
 
     @classmethod
     def perform_cross_validation(cls, task, **kwargs):
@@ -466,48 +406,7 @@ class BacktestEngine:
 
 
 
-if __name__ == '__main__':
 
-    action = 'long_short'
-    asset_currency = 'BTC'
-    indicator = 'bband'
-    orientation = 'momentum'
-    timeframe = '1h'
-    strategy = f"{orientation}_{action}"
-
-    cross_validate = True
-
-    lookback_list = list(np.arange(5, 100, 10))
-    threshold_list = list(np.arange(0, 2.5, 0.25))
-
-    kwargs = {
-        'exchange_name': 'bybit',
-        'product_type': 'linear',
-        'since': '2020-05-11',
-        'timeframe': timeframe,
-    }
-    exchange_data = CryptoExchangeDataService(asset_currency, **kwargs)
-    df = exchange_data.get_historical_data(True)
-
-    df = df[['unix_timestamp', 'close']]
-    df = df.rename(columns={'close': 'factor'})
-    df['price'] = df['factor']
-
-    df['chg'] = df['price'].pct_change()
-
-    backtest_combos = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
-
-    backtest_combos.update({
-        'df': df, 'all_lookback_lists': [lookback_list], 'threshold_list': threshold_list, 'title': f"{asset_currency}_{indicator}_{strategy}"
-    })
-
-    backtest_engine = BacktestEngine()
-
-    result = backtest_engine.strategy_effectiveness(**backtest_combos)
-    if result:
-        result_df = pd.DataFrame(result[0]['result']).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
-        print(result_df.head(5))
-    sys.exit()
 
     # import plotly.express as px
     #
