@@ -5,7 +5,7 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 
 if __name__ == '__main__':
 
-    factor_currency = ''
+    factor_currency = 'btc'
     asset_currency  = 'btc'
     action          = ''
     indicator       = ''

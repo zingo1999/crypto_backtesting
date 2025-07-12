@@ -108,11 +108,13 @@ class CryptoDataService:
                                     combinations.append(combo)
         return combinations
 
-    def generate_all_backtest_results(self):
+    def generate_all_backtest_results(self, max_cores=None):
         all_results = {}
+        params_list = []
         price_df_cache = {}
 
-        for combo in self._generate_parameter_combinations():
+        combinations = self._generate_parameter_combinations()
+        for combo in combinations:
             self.kwargs.update(combo)
             asset_currency = combo['asset_currency']
             timeframe = combo['timeframe']
@@ -128,10 +130,10 @@ class CryptoDataService:
 
             backtest_df = self.create_backtest_dataframe(price_df.copy())
             if backtest_df.empty: continue
-            print(backtest_df.tail(2), "\n")
 
             lookback_list = Utilities.generate_lookback_lists(backtest_df)
             threshold_list = Utilities.generate_threshold_list(backtest_df, indicator, self.max_threshold, self.number_of_interval)
+
             params = {
                 'action': action,
                 'asset_currency': asset_currency,
@@ -144,11 +146,14 @@ class CryptoDataService:
                 'minimum_sharpe': self.minimum_sharpe,
                 'orientation': orientation,
                 'threshold_list': threshold_list,
-                'timeframe': timeframe,
-            }
+                'timeframe': timeframe, }
+            params_list.append(params)
 
-            result = BacktestEngine.performance_evaluation(params)
+        results = Utilities.run_in_parallel(BacktestEngine.performance_evaluation, params_list, max_cores)
+
+        for result in results:
             if result:
+                factor_currency = result['factor_currency']
                 all_results.setdefault(factor_currency, []).append(result)
 
         return all_results if all_results else None
