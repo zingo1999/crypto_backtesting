@@ -12,15 +12,15 @@ if __name__ == '__main__':
     orientation     = ''
     since           = '2020-05-01'
     # since           = '2025-06-01'
-    timeframe       = '1h'
+    timeframe       = ''
 
     data_source     = 'glassnode'        # glassnode
-    endpoint        = 'options_25delta_skew_3_months'       # active_1m_3m options_25delta_skew_3_months implied
+    endpoint        = 'derivatives'       # active_1m_3m options_25delta_skew_3_months implied
     exchange_name   = 'bybit'
     product_type    = 'linear'
 
     update_mode         = True
-    minimum_sharpe      = 1
+    minimum_sharpe      = 1.5
 
     max_threshold       = 0
     number_of_interval  = 0
@@ -32,20 +32,6 @@ if __name__ == '__main__':
 
     data_service = DataAnalysis(kwargs)
     data_service.data_analysis()
-
-    ##### class 1 #####
-    crypto_exchange_data_service = CryptoExchangeDataService(**kwargs)
-    factor_df = crypto_exchange_data_service.get_historical_data()
-    # price_df = crypto_exchange_data_service.get_historical_data(True)  # True = underlying asset 的價格數據
-
-    print(factor_df.tail(3))
-    # print(price_df.tail(3))
-
-    # sys.exit()
-    #
-    # ##### class 2 #####
-    # factor_df2 = ConvertCcxtDataSerice.get_historical_data(**kwargs)
-    # price_df2 = ConvertCcxtDataSerice.get_historical_data(underlying_asset=True, **kwargs)
 
 
 

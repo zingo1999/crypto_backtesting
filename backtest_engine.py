@@ -1,25 +1,12 @@
-import sys
-import threading
-import concurrent.futures
+
 
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
 
-from tqdm import tqdm
-import seaborn as sns
-import matplotlib.pyplot as plt
-import plotly.express as px
 
-from sklearn.base import BaseEstimator
-from sklearn.model_selection import KFold
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
-
-
-
-from crypto_exchange_data_service import CryptoExchangeDataService
 
 
 
@@ -190,9 +177,12 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, asset_currency, backtest_df, endpoint, factor_currency, indicator, lookback_list, minimum_sharpe, orientation, threshold_list, timeframe, title, **kwargs):
+        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, minimum_sharpe, orientation, threshold_list, timeframe, **kwargs):
             save_result = False
+            backtest_dataframe_key = f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}"
             result_list = []
+            if endpoint.startswith('/'): endpoint = endpoint.lstrip('/')
+            endpoint = endpoint.replace('/', '|')
             for x in lookback_list:
                 for y in threshold_list:
                     parameters = {
@@ -253,154 +243,38 @@ class BacktestEngine:
                         'calmar': calmar,
                         'max_drawdown_days': max_drawdown_days,
                         'cumu': cumu,
-                        'trades': trades,
                         # 'annual_return': annual_return,
                         'benchmark_sharpe': benchmark_sharpe,
                         'pos_count': pos_count,
-                        # 'trade_count': trades,
-                        # 'win_rate': win_rate,
-                        # 'factor_currency': factor_currency,
-                        # 'asset_currency': asset_currency,
-                        # 'timeframe': timeframe,
-                        'strategy': f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}|{indicator}|{orientation}|{action}|{x}|{y}",
-                        # 'endpoint': endpoint,
+                        'trade_count': trades,
+                        'win_rate': win_rate,
+                        'strategy': f"{factor_currency}|{asset_currency}|{timeframe}|{indicator}|{orientation}|{action}|{x}|{y}|{data_source}|{endpoint}",
                     }
                     result_list.append({
                             'factor_currency': factor_currency,
                             'asset_currency': asset_currency,
+                            'timeframe': timeframe,
+                            'endpoint': endpoint,
                             'indicator': indicator,
                             'orientation': orientation,
                             'action': action,
-                            'timeframe': timeframe,
-                            'x': x,
-                            'y': y,
-                            'endpoint': endpoint,
-                            'title': title,
+                            'data_source': data_source,
+                            'backtest_dataframe_key': backtest_dataframe_key,
                             'result': result,
                             'data_quantity': len(df),
                             'end': df.index[-1],
-                            'since': df.index[0], })
+                            'since': df.index[0],
+                    })
 
                     if sharpe >= minimum_sharpe:
                         save_result = True
 
             if save_result is True:
-                return {action: result_list}
-
+                return result_list
 
         result = strategy_effectiveness(**backtest_combos)
         if result:
             return result
-
-    @classmethod
-    def perform_cross_validation(cls, task, **kwargs):
-        """
-        Perform time series cross-validation using a specified technical indicator.
-
-        Parameters:
-            backtest_df (pd.DataFrame): DataFrame with columns like 'price', 'factor', 'z', 'cumu'.
-            indicator (str): Technical indicator to use ('bband' or 'rsi').
-            x (int): Lookback period for the indicator.
-            y (Any): Additional parameter to include in the result.
-            result (dict): Dictionary containing backtest metrics (e.g., sharpe, cumu, dd).
-
-        Returns:
-            dict: Combined result with original metrics and cross-validation MSE scores.
-        """
-
-        def prepare_features(action, backtest_df, indicator, orientation, x, y, **kwargs):
-            kwargs = {
-                'action': action,
-                'indicator': indicator,
-                'orientation': orientation,
-                'x': x,
-                'y': y,
-            }
-            if indicator == 'bband':
-                backtest_df['ma'] = backtest_df['factor'].rolling(x).mean()
-                backtest_df['sd'] = backtest_df['factor'].rolling(x).std()
-                backtest_df['z'] = (backtest_df['factor'] - backtest_df['ma']) / backtest_df['sd']
-                backtest_df['upper_band'] = backtest_df['ma'] + 2 * backtest_df['sd']
-                backtest_df['lower_band'] = backtest_df['ma'] - 2 * backtest_df['sd']
-                kwargs.update({'df': backtest_df})
-                backtest_df = cls.compute_position(**kwargs)
-                features = backtest_df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
-
-            elif indicator == 'rsi':
-                delta = backtest_df['factor'].diff(1)
-                delta = delta.fillna(0)
-                gain = delta.clip(lower=0)
-                loss = -delta.clip(upper=0)
-                avg_gain = gain.rolling(x).mean()
-                avg_loss = loss.rolling(x).mean()
-                rs = avg_gain / avg_loss
-                backtest_df['rsi'] = 100 - (100 / (1 + rs))
-                kwargs.update({'df': backtest_df})
-                backtest_df = cls.compute_position(**kwargs)
-                features = backtest_df[['price', 'rsi', 'z']].iloc[x:]
-
-            else:
-                raise ValueError(f"Unsupported indicator: {indicator}")
-
-            backtest_df['trade'] = (backtest_df['pos'].diff().abs() > 0).astype(int)
-            backtest_df['pnl'] = backtest_df['pos'].shift(1) * backtest_df['chg'] - backtest_df['trade'] * 0.06 / 100
-            backtest_df['cumu'] = backtest_df['pnl'].cumsum()
-            target = backtest_df['cumu'].iloc[x:]
-            return features, target
-
-        def time_series_cv(model, features, target, n_splits=5):
-            tscv = TimeSeriesSplit(n_splits=n_splits)
-            mse_scores = []
-
-            for train_idx, test_idx in tscv.split(features):
-                X_train, X_test = features.iloc[train_idx], features.iloc[test_idx]
-                y_train, y_test = target.iloc[train_idx], target.iloc[test_idx]
-
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                mse = mean_squared_error(y_test, y_pred)
-                mse_scores.append(mse)
-
-            return np.mean(mse_scores)
-
-        def cross_validate_result(task):
-            features, target = prepare_features(**task)
-
-            models = {
-                'RandomForest': RandomForestRegressor(
-                    n_estimators=50,
-                    max_depth=10,           # 限制樹深
-                    min_samples_split=5,    # 增加分割所需樣本
-                    min_samples_leaf=4,     # 葉節點最少樣本
-                    max_features='sqrt',    # 每次分裂用部份特徵
-                    random_state=42
-                )
-            }
-
-            results = {}
-            for name, model in models.items():
-                mean_mse = time_series_cv(model, features, target)
-                results[name] = {'mean_mse': mean_mse}
-
-            return results
-
-        combined_result = {
-            'x': task['x'],
-            'y': task['y'],
-            'sharpe': task['backtest_result']['result'][0]['sharpe'],
-        }
-        cv_scores = cross_validate_result(task)
-
-        for model_name, metrics in cv_scores.items():
-            combined_result[f'{model_name}_mean_mse'] = metrics['mean_mse']
-
-        combined_result.update({
-            'factor_currency': task['factor_currency'],
-            'asset_currency': task['asset_currency'],
-            'timeframe': task['timeframe'],
-            'endpoint': task['endpoint'],
-        })
-        return combined_result
 
 
 

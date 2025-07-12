@@ -1,11 +1,17 @@
+from typing import Tuple
 
 import numpy as np
+import pandas as pd
+
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
 
 from backtest_engine import BacktestEngine
+from crypto_data_service import CryptoDataService
+from crypto_exchange_data_service import CryptoExchangeDataService
+from utilities import Utilities
 
 
 class CrossValidator:
@@ -14,7 +20,7 @@ class CrossValidator:
     and assessing model performance using cross-validation.
     """
 
-    def __int__(self):
+    def __init__(self):
         pass
 
     @classmethod
@@ -30,21 +36,20 @@ class CrossValidator:
         """
         features, target = cls.generate_features_and_target(**task)
         model_scores = cls.assess_model_performance(features, target)
-        pass
         summary = {
-            'window': task['x'],
-            'y': task['y'],
-            'sharpe': task['backtest_result']['result'][0]['sharpe'],
-            'factor_currency': task['factor_currency'],
-            'asset_currency': task['asset_currency'],
-            'timeframe': task['timeframe'],
-            'endpoint': task['endpoint'],
+            # 'factor_currency': task['factor_currency'],
+            # 'asset_currency': task['asset_currency'],
+            # 'timeframe': task['timeframe'],
+            # 'x': task['x'],
+            # 'y': task['y'],
+            # 'sharpe': task['backtest_result']['sharpe'],
         }
         summary.update(model_scores)
+        summary.update({'strategy': task['backtest_result']['strategy'],})
         return summary
 
     @staticmethod
-    def generate_features_and_target(action, backtest_df, indicator, orientation, x, y, **kwargs):
+    def generate_features_and_target(action: str, backtest_df: pd.DataFrame, indicator: str, orientation: str, x: int, y: str, **kwargs) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Generate features and target variables based on the specified indicator.
 
@@ -81,15 +86,10 @@ class CrossValidator:
             avg_loss = loss.rolling(x).mean()
             rs = avg_gain / avg_loss
             backtest_df['rsi'] = 100 - (100 / (1 + rs))
-        else:
-            raise ValueError(f"Unsupported indicator: {indicator}")
-
+        else: raise ValueError(f"Unsupported indicator: {indicator}")
         backtest_df = BacktestEngine.compute_position(**params)
-        if indicator == 'bband':
-            features = backtest_df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
-        else:
-            features = backtest_df[['price', 'rsi']].iloc[x:]
-
+        if indicator == 'bband': features = backtest_df[['factor', 'price', 'upper_band', 'lower_band', 'z']].iloc[x:]
+        else: features = backtest_df[['price', 'rsi']].iloc[x:]
         backtest_df['trade'] = (backtest_df['pos'].diff().abs() > 0).astype(int)
         backtest_df['pnl'] = backtest_df['pos'].shift(1) * backtest_df['chg'] - backtest_df['trade'] * 0.06 / 100
         backtest_df['cumulative_pnl'] = backtest_df['pnl'].cumsum()
@@ -147,3 +147,39 @@ class CrossValidator:
             mse = mean_squared_error(y_test, y_pred)
             mse_scores.append(mse)
         return np.mean(mse_scores)
+
+    @classmethod
+    def generate_tasks_from_results(cls, backtest_dataframe_keys: list, filtered_results: list, minimum_sharpe: float, kwargs: dict) -> pd.DataFrame:
+        backtest_dataframes = {
+            backtest_key: CryptoDataService({
+                **kwargs,
+                'asset_currency': backtest_key.split('|')[1],
+                'factor_currency': backtest_key.split('|')[0],
+                'timeframe': backtest_key.split('|')[2],
+                'endpoint': backtest_key.split('|')[3]
+            }).create_backtest_dataframe(CryptoExchangeDataService(backtest_key.split('|')[1], **kwargs).get_historical_data(True)) for backtest_key in backtest_dataframe_keys
+        }
+        tasks = [{
+            'action': data['action'],
+            'backtest_df': backtest_dataframes[data['backtest_dataframe_key']].copy(),
+            'backtest_result': data['result'],
+            'indicator': data['indicator'],
+            'minimum_sharpe': minimum_sharpe,
+            'orientation': data['orientation'],
+            'timeframe': data['timeframe'],
+            'x': int(data['result']['x']),
+            'y': float(data['result']['y']),
+        } for data in filtered_results]
+
+        # if tasks:
+        #     if len(tasks) > 1:
+        #         cross_validation_results = Utilities.run_in_parallel(CrossValidator.evaluate_backtest_results, tasks)
+        #     else:
+        #         cross_validation_results = [CrossValidator.evaluate_backtest_results(tasks[0])]
+        #     cv_results_df = pd.DataFrame(cross_validation_results)
+        #     print(cv_results_df.head())
+        #     return cv_results_df
+
+        if tasks:
+            cross_validation_result = (Utilities.run_in_parallel(CrossValidator.evaluate_backtest_results, tasks) if len(tasks) > 1 else [CrossValidator.evaluate_backtest_results(tasks[0])])
+            return cross_validation_result

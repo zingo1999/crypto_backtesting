@@ -4,6 +4,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -141,7 +142,6 @@ class Utilities:
         lookback_list = lookback_list[:100] if len(lookback_list) > 100 else lookback_list
         return lookback_list
 
-
     @classmethod
     def generate_threshold_list(cls, df, indicator, max_threshold, number_of_interval, multiple=1.2):
         first_threshold_step = 0
@@ -207,219 +207,57 @@ class Utilities:
         threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
-    @classmethod
-    def alpha_engine(cls, backtest_combos):
-        def strategy_effectiveness(action, all_lookback_lists, df, indicator, orientation, threshold_list, timeframe, title, **kwargs):
-            def compute_position(df, indicator, action, orientation, x, y, **kwargs):
-                strategy = f"{orientation}_{action}"
-
-                if indicator == 'bband':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['sd'] = df['factor'].rolling(x).std()
-                    df['z'] = (df['factor'] - df['ma']) / df['sd']
-
-                    bband_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
-                    }
-                    df['pos'] = bband_action_map[strategy](df['z'])
-
-                elif indicator == 'rsi':
-                    df['delta'] = df['factor'].diff(1)
-                    df['delta'] = df['delta'].astype(float).fillna(0)
-                    df['positive'] = df['delta'].clip(lower=0)
-                    df['negative'] = df['delta'].clip(upper=0)
-                    df['average_gain'] = df['positive'].rolling(x).mean()
-                    df['average_loss'] = abs(df['negative'].rolling(x).mean())
-                    df['relative_strength'] = df['average_gain'] / df['average_loss']
-                    df['z'] = 100 - (100 / (1 + df['relative_strength']))
-                    upper_bond, lower_bond = 50 + y, 50 - y
-                    rsi_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > upper_bond, 1, np.where(z < lower_bond, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > upper_bond, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < lower_bond, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > upper_bond, -1, np.where(z < lower_bond, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < lower_bond, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > upper_bond, -1, 0),
-                    }
-                    df['pos'] = rsi_action_map[strategy](df['z'])
-
-                elif indicator == 'percentile_rank':
-
-                    df['z'] = df['factor'].rank(pct=True)
-                    df['pos'] = np.where(df['z'] > y, 1, np.where(df['z'] < (100 - y), -1, 0))
-                    pass
-
-                elif indicator == 'ma_diff':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = df['factor'] / df['ma'] - 1
-
-                    ma_diff_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
-                    }
-                    df['pos'] = ma_diff_action_map[strategy](df['z'])
-
-                elif indicator == 'ma':
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = (df['factor'] - df['ma']) / df['factor']
-
-                elif indicator == 'roc':
-
-                    df['z'] = df['factor'].pct_change(periods=x) * 100
-
-                    roc_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
-                    }
-                    df['pos'] = roc_action_map[strategy](df['z'])
-
-                elif indicator == 'ma_roc':
-
-                    df['ma'] = df['factor'].rolling(x).mean()
-                    df['z'] = df['ma'].pct_change(periods=1) * 100
-
-                    ma_roc_action_map = {
-                        'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
-                        'momentum_long_only': lambda z: np.where(z > y, 1, 0),
-                        'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
-                        'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
-                        'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
-                        'reversion_short_only': lambda z: np.where(z > y, -1, 0),
-                    }
-                    df['pos'] = ma_roc_action_map[strategy](df['z'])
-
-
-                    pass
-
-                elif indicator == 'cross_ma':
-
-                    df['fast_ma'] = df['factor'].rolling(x).mean()
-                    df['slow_ma'] = df['factor'].rolling(int(y)).mean()
-
-                    cross_ma_action_dict = {
-                        'momentum_long_short': np.where(df['fast_ma'] > df['slow_ma'], 1, np.where(df['fast_ma'] < df['slow_ma'], -1, 0)),
-                        'momentum_long_only': np.where(df['fast_ma'] > df['slow_ma'], 1, 0),
-                        'momentum_short_only': np.where(df['fast_ma'] < df['slow_ma'], -1, 0),
-                        'reversion_long_short': np.where(df['fast_ma'] > df['slow_ma'], -1, np.where(df['fast_ma'] < df['slow_ma'], 1, 0)),
-                        'reversion_long_only': np.where(df['fast_ma'] > df['slow_ma'], -1, 0),
-                        'reversion_short_only': np.where(df['fast_ma'] < df['slow_ma'], 1, 0),
-                    }
-                    df['pos'] = cross_ma_action_dict[strategy]
-
-                return df['pos']
-
-            save_result = False
-            all_results = []
-            for lookback_list in all_lookback_lists:
-                result_list = []
-                for x in lookback_list:
-                    for y in threshold_list:
-                        parameters = {
-                            'df': df.copy(),
-                            'indicator': indicator,
-                            'orientation': orientation,
-                            'action': action,
-                            'timeframe': timeframe,
-                            'x': x,
-                            'y': y,
-                        }
-                        # df = df.iloc[:, :3]
-                        df['chg'] = df['price'].pct_change()
-                        df['pos'] = compute_position(**parameters)
-                        df['pos_count'] = (df['pos'] != 0).cumsum()
-                        df['trade'] = (df['pos'].diff().abs() > 0).astype(int)
-
-                        df['pnl'] = df['pos'].shift(1) * df['chg'] - df['trade'] * 0.06 / 100
-                        # df['pnl'] = df['pos'].shift(1) * df['chg']
-
-                        df['cumu'] = df['pnl'].cumsum()
-                        df['cummax'] = df['cumu'].cummax()
-                        df['dd'] = df['cummax'] - df['cumu']
-                        df['benchmark'] = df['chg']
-                        df.iloc[0:x - 1, df.columns.get_loc('benchmark')] = 0
-                        df['benchmark_cumu'] = df['benchmark'].cumsum()
-
-                        df['trade_outcome'] = np.where(df['pnl'] > 0, 1, np.where(df['pnl'] < 0, -1, 0))
-
-                        pos_count = round(df['pos_count'].iloc[-1] / len(df), 3)
-                        trades = (df['pos'].diff().abs() > 0).sum()
-
-                        drawdown_periods = np.cumsum(np.where(df['cummax'].ne(df['cummax'].shift()), 1, 0))
-                        max_drawdown_duration = (df.groupby(drawdown_periods)['cummax'].transform('count') - 1).max()
-                        max_drawdown_days = round(max_drawdown_duration * cls.TIMEFRAME_DAYS_MAP[timeframe], 1)
-
-                        total_wins = (df['trade_outcome'] == 1).sum()
-                        total_losses = (df['trade_outcome'] == -1).sum()
-                        win_rate = (total_wins / (total_wins + total_losses)) if (total_wins + total_losses) > 0 else 0
-
-                        timeunit = cls.TIMEFRAME_TIMEUNIT_MAP[timeframe]
-                        cumu = round(df['cumu'].iloc[-1], 3)
-                        mdd = round(df['dd'].max(), 2)
-                        # annual_return = round(df['pnl'].mean() * timeunit, 3)
-                        # calmar = round(annual_return / mdd, 2) if mdd != 0 else 0
-
-                        annual_return = round(df['pnl'].iloc[x - 1:].mean() * timeunit, 3)
-                        avg_return = df['pnl'].iloc[x - 1:].mean()
-                        return_sd = df['pnl'].iloc[x - 1:].std()
-                        sharpe = round(avg_return / return_sd * np.sqrt(timeunit), 2) if annual_return and return_sd else 0
-                        calmar = round(avg_return * timeunit / mdd, 2) if mdd != 0 else 0
-
-                        benchmark_mean = df['benchmark'].iloc[x - 1:].mean()
-                        benchmark_std = df['benchmark'].iloc[x - 1:].std()
-                        benchmark_sharpe = round(benchmark_mean / benchmark_std * np.sqrt(timeunit), 2) if benchmark_mean and benchmark_std else 0
-
-                        if win_rate >= 0.75: print(f"{parameters['indicator']}_{parameters['orientation']}_{x}_{y} - win rate {round(win_rate * 100, 3)}%")
-
-                        if isinstance(y, float) and 'e' in f"{y}": y = f"{y:.10f}".rstrip('0')
-
-                        # return pd.Series([x, y, sharpe, mdd, calmar, max_drawdown_days, cumu, trades, annual_return, benchmark_sharpe, pos_count, win_rate], index=['x', 'y', 'sharpe', 'mdd', 'calmar', 'max_drawdown_days', 'cumu', 'trades', 'annual_return', 'benchmark_sharpe', 'pos_count', 'win_rate'])
-                        result = {
-                            'x': x,
-                            'y': y,
-                            'sharpe': sharpe,
-                            'mdd': mdd,
-                            'calmar': calmar,
-                            'max_drawdown_days': max_drawdown_days,
-                            'cumu': cumu,
-                            'trades': trades,
-                            'annual_return': annual_return,
-                            'benchmark_sharpe': benchmark_sharpe,
-                            'pos_count': pos_count,
-                            'trade_count': trades,
-                            'win_rate': win_rate, }
-                        result_list.append(result)
-                        if sharpe >= 1: save_result = True
-                all_results.append({
-                    'since': df.index[0],
-                    'end': df.index[-1],
-                    'title': title,
-                    'result': result_list,
-                    'data_quantity': len(df),
-                })
-            if save_result is True:
-                return all_results
-
-        result = strategy_effectiveness(**backtest_combos)
-        if result:
-            return result
+    @staticmethod
+    def run_in_parallel(func, param_list, max_cores=None):
+        if not param_list:
+            return []
+        num_cores = max_cores or max(1, min(len(param_list), mp.cpu_count()))
+        with mp.Pool(processes=num_cores) as pool:
+            results = pool.map(func, param_list)
+        return results
 
     @classmethod
-    def generate_heatmap(cls, all_heatmaps, show_heatmap=False):
+    def filter_results_by_sharpe_ratio(cls, results_by_currency, min_sharpe_ratio):
+        """
+        Filter results based on a minimum Sharpe ratio.
 
-        for group_currency in all_heatmaps:
+        Parameters:
+        - results_by_currency (dict): A dictionary containing results categorized by currency pairs.
+        - min_sharpe_ratio (float): The minimum Sharpe ratio to filter results.
+
+        Returns:
+        - list: A list of unique backtest dataframe keys.
+        - list: A list of filtered results.
+        - list: A list of result data dictionaries.
+        """
+
+        unique_backtest_keys = set()
+        filtered_results = []
+        result_data_list = []
+
+        for currency_pair, results in results_by_currency.items():
+            for result_entry in results:
+                for data in result_entry:
+                    sharpe_ratio = data['result']['sharpe']
+                    if sharpe_ratio >= min_sharpe_ratio:
+                        unique_backtest_keys.add(data['backtest_dataframe_key'])
+                        filtered_results.append(data)
+                        result_data_list.append(data['result'])
+
+        return list(unique_backtest_keys), filtered_results, result_data_list
+
+    @classmethod
+    def generate_heatmap(cls, all_results, show_heatmap=False):
+
+        asset_currency_list = list(all_results.keys())
+        for asset_currency in asset_currency_list:
+            results = list(all_results[asset_currency])
+            for result in results:
+                for data in result:
+                    title = data['title']
+                    pass
+
+        for group_currency in all_results:
             for heatmap_dict in group_currency:
                 total_heatmaps = len(heatmap_dict)
 
