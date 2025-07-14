@@ -26,6 +26,8 @@ class DataAnalysis:
 
     def data_analysis(self,):
         all_results = CryptoDataService(self.kwargs).generate_all_backtest_results()
+
+        if not all_results: return
         backtest_dataframe_keys, filtered_results, result_data_list = Utilities.filter_results_by_sharpe_ratio(all_results, self.minimum_sharpe)
         if self.cross_validate is True:
             cross_validation_result = CrossValidator.generate_tasks_from_results(backtest_dataframe_keys, filtered_results, self.minimum_sharpe, self.kwargs)
@@ -33,6 +35,7 @@ class DataAnalysis:
             merged_df = pd.merge(pd.DataFrame(result_data_list).sort_values(by='sharpe', ascending=False).reset_index(drop=True), pd.DataFrame(cross_validation_result), on='strategy', how='inner')
             cols = [col for col in merged_df.columns if col != 'strategy'] + ['strategy']
             merged_df = merged_df[cols]
+            pass
 
         Utilities.generate_heatmap(all_results, True)
 

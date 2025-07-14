@@ -144,14 +144,33 @@ class BacktestEngine:
             df['ma'] = df['factor'].rolling(x).mean()
             df['z'] = df['ma'].pct_change(periods=1) * 100
 
-            ma_roc_action_map = {
+            roc_hv_action_map = {
                 'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
                 'momentum_long_only': lambda z: np.where(z > y, 1, 0),
                 'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
                 'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
                 'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
                 'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
-            df['pos'] = ma_roc_action_map[strategy](df['z'])
+            df['pos'] = roc_hv_action_map[strategy](df['z'])
+
+            pass
+
+        elif indicator == 'roc_hv':
+            x = max(x, 2)
+            df['roc'] = df['factor'].pct_change(periods=x) * 100
+            df['std'] = df['price'].rolling(x).std()
+            df['roc_z'] = (df['roc'] - df['roc'].mean()) / df['roc'].std()
+            df['std_z'] = (df['std'] - df['std'].mean()) / df['std'].std()
+            df['z'] = df['roc_z'] + df['std_z']
+
+            roc_hv_action_map = {
+                'momentum_long_short': lambda z: np.where(z > y, 1, np.where(z < -y, -1, 0)),
+                'momentum_long_only': lambda z: np.where(z > y, 1, 0),
+                'momentum_short_only': lambda z: np.where(z < -y, -1, 0),
+                'reversion_long_short': lambda z: np.where(z > y, -1, np.where(z < -y, 1, 0)),
+                'reversion_long_only': lambda z: np.where(z < -y, 1, 0),
+                'reversion_short_only': lambda z: np.where(z > y, -1, 0), }
+            df['pos'] = roc_hv_action_map[strategy](df['z'])
 
             pass
 

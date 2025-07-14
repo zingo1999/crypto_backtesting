@@ -1,4 +1,6 @@
 import pandas as pd
+from tqdm import tqdm
+
 
 from backtest_engine import BacktestEngine
 from crypto_exchange_data_service import CryptoExchangeDataService
@@ -64,7 +66,7 @@ class CryptoDataService:
             price_df = self.get_price_dataframe()
 
         factor_df = self.get_factor_dataframe()
-        if factor_df.empty:
+        if factor_df is None or factor_df.empty:
             return pd.DataFrame()
 
         if self.data_source == 'exchange' and self.endpoint in ['premium_index', 'price']:
@@ -80,80 +82,65 @@ class CryptoDataService:
 
         price_df = price_df[['unix_timestamp', 'close']].rename(columns={'close': 'price'})
 
-        backtest_df = pd.merge(factor_df, price_df, how='inner', on='unix_timestamp')
+        try:
+            backtest_df = pd.merge(factor_df, price_df, how='inner', on='unix_timestamp')
+        except Exception as e:
+            print(f"{e}")
+            return
+
         backtest_df['datetime'] = pd.to_datetime(backtest_df['unix_timestamp'], unit='ms')
         backtest_df = backtest_df.drop_duplicates(subset='unix_timestamp', keep='last').set_index('datetime')
         backtest_df['chg'] = backtest_df['price'].pct_change()
 
-        return backtest_df.dropna()
+        return backtest_df
 
-    def _generate_parameter_combinations(self):
-        combinations = []
+    def generate_all_backtest_results(self, ):
+        all_results = {}
         for timeframe in self.timeframe_list:
             for asset_currency in self.asset_currency_list:
-                for endpoint in self.get_endpoint_list():
+                price_df = CryptoExchangeDataService(asset_currency, **self.kwargs).get_historical_data(True)
+                endpoint_list = self.get_endpoint_list()
+                for endpoint in endpoint_list:
+                    self.kwargs.update({'endpoint': endpoint})
                     for factor_currency in self.factor_currency_list:
+                        self.kwargs.update({
+                            'asset_currency': asset_currency,
+                            'factor_currency': factor_currency,
+                            'timeframe': timeframe,
+                        })
+                        backtest_df = CryptoDataService(self.kwargs).create_backtest_dataframe(price_df.copy())
+                        if backtest_df.empty: continue
+                        print(f"{backtest_df.tail(2)}\n")
+                        lookback_list = Utilities.generate_lookback_lists(backtest_df.copy())
+                        backtest_combos = []
                         for indicator in self.indicator_list:
+                            threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator, self.max_threshold, self.number_of_interval)
                             for orientation in self.orientation_list:
                                 for action in self.action_list:
-                                    combo = {
+                                    para_combination = {
                                         'action': action,
                                         'asset_currency': asset_currency,
+                                        'backtest_df': backtest_df,
+                                        'data_source': self.data_source,
+                                        # 'endpoint_path': endpoint_path,
                                         'endpoint': endpoint,
                                         'factor_currency': factor_currency,
                                         'indicator': indicator,
+                                        'lookback_list': lookback_list,
                                         'orientation': orientation,
+                                        # 'max_recovery_days': max_recovery_days,
+                                        'minimum_sharpe': self.minimum_sharpe,
+                                        # 'minimum_trades': minimum_trades,
+                                        # 't_plus': t_plus,
+                                        'strategy': f"{indicator}{orientation}{action}",
+                                        'threshold_list': threshold_list,
                                         'timeframe': timeframe,
-                                    }
-                                    combinations.append(combo)
-        return combinations
-
-    def generate_all_backtest_results(self, max_cores=None):
-        all_results = {}
-        params_list = []
-        price_df_cache = {}
-
-        combinations = self._generate_parameter_combinations()
-        for combo in combinations:
-            self.kwargs.update(combo)
-            asset_currency = combo['asset_currency']
-            timeframe = combo['timeframe']
-            factor_currency = combo['factor_currency']
-            endpoint = combo['endpoint']
-            indicator = combo['indicator']
-            orientation = combo['orientation']
-            action = combo['action']
-
-            cache_key = f"{asset_currency}_{timeframe}"
-            if cache_key not in price_df_cache: price_df_cache[cache_key] = CryptoExchangeDataService(asset_currency, **self.kwargs).get_historical_data(True)
-            price_df = price_df_cache[cache_key]
-
-            backtest_df = self.create_backtest_dataframe(price_df.copy())
-            if backtest_df.empty: continue
-
-            lookback_list = Utilities.generate_lookback_lists(backtest_df)
-            threshold_list = Utilities.generate_threshold_list(backtest_df, indicator, self.max_threshold, self.number_of_interval)
-
-            params = {
-                'action': action,
-                'asset_currency': asset_currency,
-                'backtest_df': backtest_df,
-                'data_source': self.data_source,
-                'endpoint': endpoint,
-                'factor_currency': factor_currency,
-                'indicator': indicator,
-                'lookback_list': lookback_list,
-                'minimum_sharpe': self.minimum_sharpe,
-                'orientation': orientation,
-                'threshold_list': threshold_list,
-                'timeframe': timeframe, }
-            params_list.append(params)
-
-        results = Utilities.run_in_parallel(BacktestEngine.performance_evaluation, params_list, max_cores)
-
-        for result in results:
-            if result:
-                factor_currency = result['factor_currency']
-                all_results.setdefault(factor_currency, []).append(result)
-
-        return all_results if all_results else None
+                                        'title': f"{factor_currency}{asset_currency}{self.data_source}{endpoint}{timeframe}{indicator}{orientation}_{action}",}
+                                    backtest_combos.append(para_combination)
+                        if len(backtest_combos) > 1: backtest_results = Utilities.run_in_parallel(BacktestEngine.performance_evaluation, backtest_combos)
+                        else: backtest_results = [BacktestEngine.performance_evaluation(backtest_combos[0])]
+                        if any(element is not None for element in backtest_results):
+                            backtest_results = [result for result in backtest_results if result is not None]
+                            all_results.update({factor_currency: backtest_results})
+        if all_results:
+            return all_results

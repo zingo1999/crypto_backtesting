@@ -76,59 +76,6 @@ class Utilities:
             max_lookback = min(len(df) // 10, max_3_months_lookback)
         if lookback_step is None: lookback_step = 5
 
-        # all_lookback_list = []
-        # current_lookback_list = []
-        # list_count = 1
-        # last_lookback = 2
-        #
-        # ###
-        #
-        # current_lookback_list = []
-        # j = 0
-        # while True:
-        #     value = math.ceil(last_lookback * (1.08 ** j))
-        #
-        #     if current_lookback_list and value <= current_lookback_list[-1]: value = current_lookback_list[-1] + 3
-        #
-        #     if value > max_lookback and len(current_lookback_list) == 25:
-        #         all_lookback_list.append(current_lookback_list)
-        #         break
-        #     elif len(current_lookback_list) == 25:
-        #         all_lookback_list.append(current_lookback_list)
-        #         # current_lookback_list = [current_lookback_list[-1], value]
-        #         current_lookback_list = [value]
-        #     else:
-        #         current_lookback_list.append(value)
-        #     j += 1
-        #
-        # ###
-        #
-        # # for i in range(first_step, max_lookback + 1, lookback_step):
-        # #     if list_count < 3 and len(current_lookback_list) < 50:
-        # #         current_lookback_list.append(i)
-        # #     elif list_count < 3 and len(current_lookback_list) == 50:
-        # #         all_lookback_list.append(current_lookback_list)
-        # #         last_lookback = current_lookback_list[-1] + 5
-        # #         list_count += 1
-        # #         current_lookback_list = [i]
-        # #     else:
-        # #         current_lookback_list = []
-        # #         j = 0
-        # #         while True:
-        # #             value = math.ceil(last_lookback * (1.035 ** j))
-        # #             if value > max_lookback and len(current_lookback_list) == 25:
-        # #                 all_lookback_list.append(current_lookback_list)
-        # #                 break
-        # #             elif len(current_lookback_list) == 25:
-        # #                 all_lookback_list.append(current_lookback_list)
-        # #                 current_lookback_list = [current_lookback_list[-1], value]
-        # #             else: current_lookback_list.append(value)
-        # #             j += 1
-        # #         break
-        # if len(all_lookback_list) > 1 and len(all_lookback_list) % 2 == 1:
-        #     return all_lookback_list[:-1]
-        # return all_lookback_list
-
         lookback_list = [
             2, 3, 8, 11, 14, 18, 22, 26, 30, 35, 40, 45, 50,
             *[int(x) for x in np.arange(55, 105, 5)],
@@ -196,14 +143,25 @@ class Utilities:
                 max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
                 pass
 
+        elif indicator == 'roc_hv':
+            if not max_threshold:
+                x = max(x, 2)
+                df['roc'] = df['factor'].pct_change(periods=x) * 100
+                df['std'] = df['price'].rolling(x).std()
+                df['roc_z'] = (df['roc'] - df['roc'].mean()) / df['roc'].std()
+                df['std_z'] = (df['std'] - df['std'].mean()) / df['std'].std()
+                df['z'] = df['roc_z'] + df['std_z']
+
+                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
 
         elif indicator == 'cross_ma':
             first_threshold_step = 5
             max_threshold = 100
+            pass
 
         else: max_threshold = 10
 
-        threshold_step = max_threshold / number_of_interval
+        threshold_step = max_threshold * 1.1 / number_of_interval
         threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
@@ -252,10 +210,186 @@ class Utilities:
         asset_currency_list = list(all_results.keys())
         for asset_currency in asset_currency_list:
             results = list(all_results[asset_currency])
-            for result in results:
-                for data in result:
-                    title = data['title']
-                    pass
+            total_heatmaps = list(results)
+            for heatmap in results:
+                heatmap_data = []
+                for param_combos in heatmap:
+                    heatmap_data.append(param_combos['result'])
+
+                title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}"
+                chunks = [heatmap_data[i:i + 250] for i in range(0, len(heatmap_data), 250)]
+                if len(chunks) >= 2:
+                    if len(chunks) % 2 != 0: chunks.pop()
+                    for i in range(0, len(chunks), 2):
+                        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+                        data_table1 = pd.DataFrame(chunks[i]).pivot_table(index='x', columns='y', values='sharpe')
+                        sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+                        ax1.yaxis.set_tick_params(rotation=0)
+
+                        if i + 1 < len(chunks):
+                            # subfolder_path2 = heatmap_data.get('subfolder_path', '')
+                            plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
+                            data_table2 = pd.DataFrame(chunks[i+1]).pivot_table(index='x', columns='y', values='sharpe')
+                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+                            ax2.yaxis.set_tick_params(rotation=0)
+                        if show_heatmap:
+                            plt.show()
+
+
+                else:
+                    plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
+                    fig, ax = plt.subplots(figsize=(10, 7))
+                    data_table = pd.DataFrame(heatmap_data).pivot_table(index='x', columns='y', values='sharpe')
+                    sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={
+                        'fontsize': 8})
+                    ax.yaxis.set_tick_params(rotation=0)
+                    plt.show()
+                    plt.close(fig)
+
+                    if show_heatmap:
+                        plt.show()
+                    # else:
+                    #     heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
+                    #     fig.savefig(f"{heatmap_file_path}_all_time")
+                    plt.close(fig)
+
+                sys.exit()
+                # Create the heatmap
+                plt.figure(figsize=(10, 8))
+                sns.heatmap(heatmap_data, annot=True, cmap='coolwarm', cbar=True)
+
+                # Set titles and labels
+                plt.title('Heatmap of Sharpe Ratios')
+                plt.xlabel('y')
+                plt.ylabel('x')
+
+                # Show the heatmap
+                plt.show()
+
+                pass
+
+            if total_heatmaps == 1:
+                heatmap_data = results[0]
+                title = heatmap_data['title']
+                subfolder_path = heatmap_data.get('subfolder_path', '')
+                fig, ax = plt.subplots(figsize=(10, 7))
+                plt.suptitle(f"{title}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                result_list = heatmap_data['result']
+                data_table = pd.DataFrame(result_list).pivot_table(index='x', columns='y', values='sharpe')
+                sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+
+                ax.yaxis.set_tick_params(rotation=0)
+
+                if show_heatmap:
+                    plt.show()
+                else:
+                    heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
+                    fig.savefig(f"{heatmap_file_path}_all_time")
+                plt.close(fig)
+
+            else:
+                if total_heatmaps % 2 == 0:
+                    for i in range(0, total_heatmaps, 2):
+                        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+                        plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+
+                        heatmap_data = total_heatmaps[i]
+                        title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
+                        # subfolder_path1 = heatmap_data.get('subfolder_path', '')
+                        plt.suptitle(f"{title1}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                        result_list1 = heatmap_data['result']
+                        for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+                        if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1):
+                            result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
+
+                        data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+                        sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+
+                        ax1.yaxis.set_tick_params(rotation=0)
+
+                        if i + 1 < total_heatmaps:
+                            heatmap_data = total_heatmaps[i + 1]
+                            title2 = heatmap_data['title']
+                            # subfolder_path2 = heatmap_data.get('subfolder_path', '')
+                            plt.suptitle(f"{title2}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                            result_list2 = heatmap_data['result']
+                            for result in result_list2: result['y'] = float(result['y'])
+                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+                                   result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+
+                            data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+
+                            ax2.yaxis.set_tick_params(rotation=0)
+
+                        if show_heatmap:
+                            plt.show()
+                        else:
+                            heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+                            fig.savefig(f"{heatmap_file_path}_all_time")
+                        plt.close(fig)
+
+                else:
+                    for i in range(0, total_heatmaps, 2):
+                        if i + 1 < total_heatmaps:
+                            fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+                            plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+
+                            heatmap_data = total_heatmaps[i]
+                            title1 = heatmap_data['title']
+                            subfolder_path1 = heatmap_data.get('subfolder_path', '')
+                            plt.suptitle(f"{title1}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                            result_list1 = heatmap_data['result_list']
+                            for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+                                   result_list1): result_list1 = [{**result,'y': f"{result['y']:.6f}"} for result in result_list1]
+
+                            data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+                            sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+
+                            heatmap_data = total_heatmaps[i + 1]
+                            title2 = heatmap_data['title']
+                            plt.suptitle(f"{title2}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                            result_list2 = heatmap_data['result_list']
+                            for result in result_list2: result['y'] = float(result['y'])  # Convert to float
+                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+                                   result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+                            data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+
+                            if show_heatmap:
+                                plt.show()
+                            else:
+                                heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+                                fig.savefig(f"{heatmap_file_path}_all_time")
+                            plt.close(fig)
+
+                        else:
+                            heatmap_data = total_heatmaps[i]
+                            title = heatmap_data['title']
+                            subfolder_path = heatmap_data.get('subfolder_path', '')
+                            fig, ax = plt.subplots(figsize=(10, 7))
+                            plt.suptitle(f"{title}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+                            result_list3 = heatmap_data['result_list']
+                            data_table = pd.DataFrame(result_list3).pivot_table(index='x', columns='y', values='sharpe')
+                            sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+                            if show_heatmap:
+                                plt.show()
+                            else:
+                                heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
+                                fig.savefig(f"{heatmap_file_path}_all_time")
+                            plt.close(fig)
+
+
+
+
+            for heatmap in total_heatmaps:
+                title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
+
+                for result in heatmap:
+                    for data in result:
+                        title = f"{data['factor_currency']}|{data['asset_currency']}|{data['timeframe']}|{data['data_source']}|{data['endpoint']}|{data['indicator']}|{data['orientation']}|{data['action']}\nx {data['result']['x']}, y {data['result']['y']}, sharpe {data['result']['sharpe']}, mdd {data['result']['mdd']}, pos_count {data['result']['pos_count']}"
+                        pass
 
         for group_currency in all_results:
             for heatmap_dict in group_currency:
