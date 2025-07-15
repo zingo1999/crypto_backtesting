@@ -20,7 +20,7 @@ pd.set_option('display.max_colwidth', None)
 logging.basicConfig(level=logging.INFO)
 
 data_folder = 'data'
-if not os.path.isdir(data_folder): os.mkdir(data_folder)
+os.makedirs(data_folder, exist_ok=True)
 
 
 # Class definition

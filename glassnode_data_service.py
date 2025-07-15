@@ -17,6 +17,9 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 pd.set_option('display.max_colwidth', None)
 
+data_folder = 'data'
+os.makedirs(data_folder, exist_ok=True)
+
 
 class GlassnodeDataService:
 
@@ -74,7 +77,7 @@ class GlassnodeDataService:
         endpoint = endpoint_path.split('/')[-1]
 
         if category == 'derivatives': exchange_name = 'deribit'
-        print(endpoint)
+        print(f"{self.factor_currency}|{self.timeframe}|{endpoint}")
 
         params = {
                 'api_key': self.DATA_SOURCE_KEY,
@@ -85,6 +88,7 @@ class GlassnodeDataService:
         }
         try:
             response = requests.get(f"{self.base_url}{endpoint_path}", params=params)
+            time.sleep(1)
             if response.status_code == 200:
                 data = response.json()
                 if endpoint_path != '/derivatives/options_open_interest_distribution':

@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 from tqdm import tqdm
 
 
@@ -7,6 +8,8 @@ from crypto_exchange_data_service import CryptoExchangeDataService
 from glassnode_data_service import GlassnodeDataService
 from utilities import Utilities
 
+data_folder = 'data'
+os.makedirs(data_folder, exist_ok=True)
 
 class CryptoDataService:
 
@@ -143,6 +146,7 @@ class CryptoDataService:
                             backtest_results = [result for result in backtest_results if result is not None]
                             all_results.update({factor_currency: backtest_results})
         if all_results:
+            os.makedirs('backtest_results', exist_ok=True)
             extracted_results = []
             factor_currency_keys = list(all_results.keys())
             for currency in factor_currency_keys:
@@ -152,3 +156,4 @@ class CryptoDataService:
                         extracted_results.append(data_point['result'])
             results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
             return all_results
+
