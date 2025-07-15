@@ -143,4 +143,12 @@ class CryptoDataService:
                             backtest_results = [result for result in backtest_results if result is not None]
                             all_results.update({factor_currency: backtest_results})
         if all_results:
+            extracted_results = []
+            factor_currency_keys = list(all_results.keys())
+            for currency in factor_currency_keys:
+                data_entries = all_results[currency]
+                for entry in data_entries:
+                    for data_point in entry:
+                        extracted_results.append(data_point['result'])
+            results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
             return all_results

@@ -7,9 +7,9 @@ if __name__ == '__main__':
 
     factor_currency = 'btc'
     asset_currency  = 'btc'
-    action          = 'long_only'
-    indicator       = 'bband'
-    orientation     = 'momentum'
+    action          = ''
+    indicator       = 'roc_hv'
+    orientation     = ''
     since           = '2020-05-01'
     # since           = '2025-06-01'
     timeframe       = '1h'
