@@ -155,7 +155,6 @@ class CryptoDataService:
                 for entry in data_entries:
                     for data_point in entry:
                         extracted_results.append(data_point['result'])
-
             results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
             results_df.to_csv(f"{subfolder_path}.csv")
             return all_results
