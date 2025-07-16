@@ -294,7 +294,6 @@ class Utilities:
 
                 # Show the heatmap
                 plt.show()
-
                 pass
 
             if total_heatmaps == 1:
