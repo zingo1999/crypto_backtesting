@@ -260,14 +260,14 @@ class BacktestEngine:
                         'sharpe': sharpe,
                         'mdd': mdd,
                         'calmar': calmar,
-                        'max_drawdown_days': max_drawdown_days,
+                        'benchmark': benchmark_sharpe,
                         'cumu': cumu,
                         # 'annual_return': annual_return,
-                        'benchmark_sharpe': benchmark_sharpe,
                         'pos_count': pos_count,
                         'trade_count': trades,
-                        'win_rate': win_rate,
-                        'strategy': f"{factor_currency}|{asset_currency}|{timeframe}|{indicator}|{orientation}|{action}|{x}|{y}|{data_source}|{endpoint}",
+                        'max_dd_days': max_drawdown_days,
+                        'win_rate': round(win_rate, 3),
+                        'strategy': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|{x}|{y}",
                     }
                     result_list.append({
                             'factor_currency': factor_currency,

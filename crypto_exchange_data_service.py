@@ -19,6 +19,9 @@ pd.set_option('display.max_colwidth', None)
 
 logging.basicConfig(level=logging.INFO)
 
+data_folder = 'data'
+os.makedirs(data_folder, exist_ok=True)
+
 
 # Class definition
 class CryptoExchangeDataService:

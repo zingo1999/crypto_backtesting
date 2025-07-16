@@ -90,10 +90,36 @@ class Utilities:
         return lookback_list
 
     @classmethod
-    def generate_threshold_list(cls, df, indicator, max_threshold, number_of_interval, multiple=1.2):
+    def generate_threshold_list(cls, df: pd.DataFrame, indicator: str, max_threshold: float, number_of_intervals: int) -> np.ndarray:
+        """
+        Generates a list of threshold values based on the given indicator and parameters.
+
+        Parameters:
+        - df: DataFrame containing the data.
+        - indicator: Type of indicator ('bband' or others).
+        - max_threshold: The maximum threshold value.
+        - number_of_intervals: The number of intervals for threshold calculation.
+
+        Returns:
+        - A NumPy array of threshold values.
+        """
+
+        def calculate_step_size(max_threshold: float, number_of_intervals: int) -> float:
+            """Calculates the step size based on the max threshold and number of intervals."""
+
+            if max_threshold == 0: return 0
+            y = max_threshold / number_of_intervals
+            if max_threshold > 100: return int(y)
+            elif max_threshold > 10: return round(y, 1)
+            elif max_threshold > 1: return round(y, 2)
+            elif max_threshold >= 0.1: return round(y, 3)
+            elif max_threshold >= 0.01: return round(y, 4)
+            elif max_threshold >= 0.001: return round(y, 5)
+            else: return round(y, 6)
+
         first_threshold_step = 0
         x = 2
-        if not number_of_interval: number_of_interval = 10
+        if not number_of_intervals: number_of_intervals = 10
 
         if indicator == 'bband':
             if not max_threshold:
@@ -159,9 +185,8 @@ class Utilities:
             max_threshold = 100
             pass
 
-        else: max_threshold = 10
-
-        threshold_step = max_threshold * 1.1 / number_of_interval
+        max_threshold *= 1.1
+        threshold_step = calculate_step_size(max_threshold, number_of_intervals)
         threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
@@ -234,6 +259,10 @@ class Utilities:
                             ax2.yaxis.set_tick_params(rotation=0)
                         if show_heatmap:
                             plt.show()
+                        else:
+                            heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+                            fig.savefig(f"{heatmap_file_path}_all_time")
+                        plt.close(fig)
 
 
                 else:

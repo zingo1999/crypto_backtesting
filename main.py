@@ -5,10 +5,10 @@ from data_analysis import DataAnalysis
 
 if __name__ == '__main__':
 
-    factor_currency = 'btc'
+    factor_currency = ''
     asset_currency  = 'btc'
     action          = ''
-    indicator       = 'roc_hv'
+    indicator       = ''
     orientation     = ''
     since           = '2020-05-01'
     # since           = '2025-06-01'
