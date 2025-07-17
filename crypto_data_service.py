@@ -11,28 +11,32 @@ from utilities import Utilities
 
 class CryptoDataService:
 
+    def __init__(self, params: dict):
+        """
+        初始化 CryptoDataService 實例。
 
+        :param params: 包含所有初始化參數的字典
+        """
+        # 設置默認值
+        self.action = params.get('action', '')
+        self.asset_currency = params.get('asset_currency', '')
+        self.cross_validate = params.get('cross_validate', '')
+        self.data_source = params.get('data_source', '')
+        self.endpoint = params.get('endpoint', '')
+        self.factor_currency = params.get('factor_currency', '')
+        self.indicator = params.get('indicator', '')
+        self.kwargs = params
+        self.max_threshold = params.get('max_threshold', None)
+        self.minimum_sharpe = params.get('minimum_sharpe', None)
+        self.number_of_interval = params.get('number_of_interval', None)
+        self.orientation = params.get('orientation', '')
+        self.timeframe = params.get('timeframe', '')
 
-    def __init__(self, kwargs):
-        self.action = ''
-        self.asset_currency = ''
-        self.cross_validate = ''
-        self.data_source = ''
-        self.endpoint = ''
-        self.factor_currency = ''
-        self.indicator = ''
-        self.kwargs = kwargs
-        self.max_threshold = ''
-        self.minimum_sharpe = ''
-        self.number_of_interval = ''
-        self.orientation = ''
-        self.timeframe = ''
-        for key, value in kwargs.items(): setattr(self, key, value)
-
+        # 初始化其他屬性
         self.action_list = [self.action] if self.action else ['long_short', 'long_only', 'short_only']
         self.asset_currency_list = [self.asset_currency.upper()] if self.asset_currency else ['BTC', 'ETH', 'SOL']
         self.factor_currency_list = [self.factor_currency.upper()] if self.factor_currency else ['BTC', 'ETH', 'SOL']
-        self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi']  # , 'ma_diff', 'ma_roc']
+        self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi']
         self.orientation_list = [self.orientation] if self.orientation else ['momentum', 'reversion']
         self.timeframe_list = [self.timeframe] if self.timeframe else ['10m', '1h', '1d']
 
