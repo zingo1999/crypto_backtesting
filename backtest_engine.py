@@ -158,7 +158,7 @@ class BacktestEngine:
         elif indicator == 'roc_hv':
             x = max(x, 2)
             df['roc'] = df['factor'].pct_change(periods=x) * 100
-            df['std'] = df['price'].rolling(x).std()
+            df['std'] = df['factor'].rolling(x).std()
             df['roc_z'] = (df['roc'] - df['roc'].mean()) / df['roc'].std()
             df['std_z'] = (df['std'] - df['std'].mean()) / df['std'].std()
             df['z'] = df['roc_z'] + df['std_z']
@@ -230,7 +230,7 @@ class BacktestEngine:
 
                     drawdown_periods = np.cumsum(np.where(df['cummax'].ne(df['cummax'].shift()), 1, 0))
                     max_drawdown_duration = (df.groupby(drawdown_periods)['cummax'].transform('count') - 1).max()
-                    max_drawdown_days = round(max_drawdown_duration * cls.TIMEFRAME_DAYS_MAP[timeframe], 1)
+                    max_drawdown_days = round(max_drawdown_duration * cls.TIMEFRAME_DAYS_MAP[timeframe])
 
                     total_wins = (df['trade_outcome'] == 1).sum()
                     total_losses = (df['trade_outcome'] == -1).sum()
@@ -283,12 +283,17 @@ class BacktestEngine:
                             'data_quantity': len(df),
                             'end': df.index[-1],
                             'since': df.index[0],
+                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|overall"
+,
                     })
 
                     if sharpe >= minimum_sharpe:
                         save_result = True
 
             if save_result is True:
+                all_all = []
+                for ae in result_list:
+                    all_all.append(ae['result'])
                 return result_list
 
         result = strategy_effectiveness(**backtest_combos)

@@ -1,6 +1,7 @@
 import os
 import math
 import sys
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -123,24 +124,31 @@ class Utilities:
 
         if indicator == 'bband':
             if not max_threshold:
-                df['ma'] = df['factor'].rolling(x).mean()
-                df['sd'] = df['factor'].rolling(x).std()
-                df['z'] = (df['factor'] - df['ma']) / df['sd']
-                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
-                if np.isnan(max_threshold): max_threshold = 2.5
+                # df['ma'] = df['factor'].rolling(x).mean()
+                # df['sd'] = df['factor'].rolling(x).std()
+                # df['z'] = (df['factor'] - df['ma']) / df['sd']
+                # max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+                # if np.isnan(max_threshold): max_threshold = 2.5
+
+                # threshold_step = calculate_step_size(max_threshold, number_of_intervals)
+                # threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
+                threshold_list = np.round(np.arange(0, 3.3, 0.3), 6)
             else: max_threshold = max(0.1, max_threshold)
 
         elif indicator == 'rsi':
             if not max_threshold:
-                df['delta'] = df['factor'].diff(1)
-                df['delta'] = df['delta'].astype(float).fillna(0)
-                df['positive'] = df['delta'].clip(lower=0)
-                df['negative'] = df['delta'].clip(upper=0)
-                df['average_gain'] = df['positive'].rolling(x).mean()
-                df['average_loss'] = abs(df['negative'].rolling(x).mean())
-                df['relative_strength'] = df['average_gain'] / df['average_loss']
-                df['z'] = 100 - (100 / (1 + df['relative_strength']))
-                max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+                # df['delta'] = df['factor'].diff(1)
+                # df['delta'] = df['delta'].astype(float).fillna(0)
+                # df['positive'] = df['delta'].clip(lower=0)
+                # df['negative'] = df['delta'].clip(upper=0)
+                # df['average_gain'] = df['positive'].rolling(x).mean()
+                # df['average_loss'] = abs(df['negative'].rolling(x).mean())
+                # df['relative_strength'] = df['average_gain'] / df['average_loss']
+                # df['z'] = 100 - (100 / (1 + df['relative_strength']))
+                # max_threshold = np.nanstd(df['z'].replace([np.inf, -np.inf], np.nan))
+
+                threshold_list = np.round(np.arange(0, 50, 4.9), 6)
+                # threshold_list = np.round(np.arange(0.5, 50.1, 4.9), 6)
             else: max_threshold = max(0.1, min(max_threshold, 55.5))
 
         elif indicator == 'ma_diff':
@@ -185,9 +193,9 @@ class Utilities:
             max_threshold = 100
             pass
 
-        max_threshold *= 1.1
-        threshold_step = calculate_step_size(max_threshold, number_of_intervals)
-        threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
+        # max_threshold *= 1.1
+        # threshold_step = calculate_step_size(max_threshold, number_of_intervals)
+        # threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
     @staticmethod
@@ -220,12 +228,13 @@ class Utilities:
 
         for currency_pair, results in results_by_currency.items():
             for result_entry in results:
-                for data in result_entry:
-                    sharpe_ratio = data['result']['sharpe']
-                    if sharpe_ratio >= min_sharpe_ratio:
-                        unique_backtest_keys.add(data['backtest_dataframe_key'])
-                        filtered_results.append(data)
-                        result_data_list.append(data['result'])
+                for result in result_entry:
+                    for data in result:
+                        sharpe_ratio = data['result']['sharpe']
+                        if sharpe_ratio >= min_sharpe_ratio:
+                            unique_backtest_keys.add(data['backtest_dataframe_key'])
+                            filtered_results.append(data)
+                            result_data_list.append(data['result'])
 
         return list(unique_backtest_keys), filtered_results, result_data_list
 
@@ -234,302 +243,308 @@ class Utilities:
 
         asset_currency_list = list(all_results.keys())
         for asset_currency in asset_currency_list:
-            results = list(all_results[asset_currency])
-            total_heatmaps = list(results)
-            for heatmap in results:
-                heatmap_data = []
-                for param_combos in heatmap:
-                    heatmap_data.append(param_combos['result'])
+            backtest_results_folder = f"backtest_results/{asset_currency}"
+            os.makedirs(backtest_results_folder, exist_ok=True)
 
-                title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}"
-                chunks = [heatmap_data[i:i + 250] for i in range(0, len(heatmap_data), 250)]
-                if len(chunks) >= 2:
-                    if len(chunks) % 2 != 0: chunks.pop()
-                    for i in range(0, len(chunks), 2):
-                        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                        data_table1 = pd.DataFrame(chunks[i]).pivot_table(index='x', columns='y', values='sharpe')
-                        sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-                        ax1.yaxis.set_tick_params(rotation=0)
+            different_timeframe_results = all_results[asset_currency]
+            for results in different_timeframe_results:
+                for heatmap in results:
+                    heatmap_data = []
+                    title = heatmap[0]['title']
+                    subfolder_path = os.path.join(backtest_results_folder, f"{heatmap[0]['action']}/{heatmap[0]['timeframe']}/{title.rsplit('|', 1)[0]}")
 
-                        if i + 1 < len(chunks):
-                            # subfolder_path2 = heatmap_data.get('subfolder_path', '')
-                            plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
-                            data_table2 = pd.DataFrame(chunks[i+1]).pivot_table(index='x', columns='y', values='sharpe')
-                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-                            ax2.yaxis.set_tick_params(rotation=0)
-                        if show_heatmap:
-                            plt.show()
-                        else:
-                            heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
-                            fig.savefig(f"{heatmap_file_path}_all_time")
-                        plt.close(fig)
+                    for result in heatmap:
+                        heatmap_data.append(result['result'])
 
-
-                else:
-                    plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
-                    fig, ax = plt.subplots(figsize=(10, 7))
-                    data_table = pd.DataFrame(heatmap_data).pivot_table(index='x', columns='y', values='sharpe')
-                    sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={
-                        'fontsize': 8})
-                    ax.yaxis.set_tick_params(rotation=0)
-                    plt.show()
-                    plt.close(fig)
-
-                    if show_heatmap:
-                        plt.show()
-                    # else:
-                    #     heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
-                    #     fig.savefig(f"{heatmap_file_path}_all_time")
-                    plt.close(fig)
-
-                sys.exit()
-                # Create the heatmap
-                plt.figure(figsize=(10, 8))
-                sns.heatmap(heatmap_data, annot=True, cmap='coolwarm', cbar=True)
-
-                # Set titles and labels
-                plt.title('Heatmap of Sharpe Ratios')
-                plt.xlabel('y')
-                plt.ylabel('x')
-
-                # Show the heatmap
-                plt.show()
-                pass
-
-            if total_heatmaps == 1:
-                heatmap_data = results[0]
-                title = heatmap_data['title']
-                subfolder_path = heatmap_data.get('subfolder_path', '')
-                fig, ax = plt.subplots(figsize=(10, 7))
-                plt.suptitle(f"{title}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                result_list = heatmap_data['result']
-                data_table = pd.DataFrame(result_list).pivot_table(index='x', columns='y', values='sharpe')
-                sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                ax.yaxis.set_tick_params(rotation=0)
-
-                if show_heatmap:
-                    plt.show()
-                else:
-                    heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
-                    fig.savefig(f"{heatmap_file_path}_all_time")
-                plt.close(fig)
-
-            else:
-                if total_heatmaps % 2 == 0:
-                    for i in range(0, total_heatmaps, 2):
-                        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                        plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
-
-                        heatmap_data = total_heatmaps[i]
-                        title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
-                        # subfolder_path1 = heatmap_data.get('subfolder_path', '')
-                        plt.suptitle(f"{title1}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                        result_list1 = heatmap_data['result']
-                        for result in result_list1: result['y'] = float(result['y'])  # Convert to float
-                        if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1):
-                            result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
-
-                        data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
-                        sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                        ax1.yaxis.set_tick_params(rotation=0)
-
-                        if i + 1 < total_heatmaps:
-                            heatmap_data = total_heatmaps[i + 1]
-                            title2 = heatmap_data['title']
-                            # subfolder_path2 = heatmap_data.get('subfolder_path', '')
-                            plt.suptitle(f"{title2}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                            result_list2 = heatmap_data['result']
-                            for result in result_list2: result['y'] = float(result['y'])
-                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
-                                   result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
-
-                            data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
-                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                            ax2.yaxis.set_tick_params(rotation=0)
-
-                        if show_heatmap:
-                            plt.show()
-                        else:
-                            heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
-                            fig.savefig(f"{heatmap_file_path}_all_time")
-                        plt.close(fig)
-
-                else:
-                    for i in range(0, total_heatmaps, 2):
-                        if i + 1 < total_heatmaps:
+                    chunks = [heatmap_data[i:i + 275] for i in range(0, len(heatmap_data), 275)]
+                    if len(chunks) >= 2:
+                        if len(chunks) % 2 != 0: chunks.pop()
+                        for i in range(0, len(chunks), 2):
                             fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                            plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
-
-                            heatmap_data = total_heatmaps[i]
-                            title1 = heatmap_data['title']
-                            subfolder_path1 = heatmap_data.get('subfolder_path', '')
-                            plt.suptitle(f"{title1}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                            result_list1 = heatmap_data['result_list']
-                            for result in result_list1: result['y'] = float(result['y'])  # Convert to float
-                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
-                                   result_list1): result_list1 = [{**result,'y': f"{result['y']:.6f}"} for result in result_list1]
-
-                            data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+                            data_table1 = pd.DataFrame(chunks[i]).pivot_table(index='x', columns='y', values='sharpe')
                             sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                            heatmap_data = total_heatmaps[i + 1]
-                            title2 = heatmap_data['title']
-                            plt.suptitle(f"{title2}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                            result_list2 = heatmap_data['result_list']
-                            for result in result_list2: result['y'] = float(result['y'])  # Convert to float
-                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
-                                   result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
-                            data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
-                            sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                            if show_heatmap:
-                                plt.show()
-                            else:
-                                heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
-                                fig.savefig(f"{heatmap_file_path}_all_time")
-                            plt.close(fig)
-
-                        else:
-                            heatmap_data = total_heatmaps[i]
-                            title = heatmap_data['title']
-                            subfolder_path = heatmap_data.get('subfolder_path', '')
-                            fig, ax = plt.subplots(figsize=(10, 7))
-                            plt.suptitle(f"{title}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                            result_list3 = heatmap_data['result_list']
-                            data_table = pd.DataFrame(result_list3).pivot_table(index='x', columns='y', values='sharpe')
-                            sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-                            if show_heatmap:
-                                plt.show()
-                            else:
-                                heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
-                                fig.savefig(f"{heatmap_file_path}_all_time")
-                            plt.close(fig)
-
-
-
-
-            for heatmap in total_heatmaps:
-                title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
-
-                for result in heatmap:
-                    for data in result:
-                        title = f"{data['factor_currency']}|{data['asset_currency']}|{data['timeframe']}|{data['data_source']}|{data['endpoint']}|{data['indicator']}|{data['orientation']}|{data['action']}\nx {data['result']['x']}, y {data['result']['y']}, sharpe {data['result']['sharpe']}, mdd {data['result']['mdd']}, pos_count {data['result']['pos_count']}"
-                        pass
-
-        for group_currency in all_results:
-            for heatmap_dict in group_currency:
-                total_heatmaps = len(heatmap_dict)
-
-                if total_heatmaps == 1:
-                    heatmap_data = heatmap_dict[0]
-                    title = heatmap_data['title']
-                    subfolder_path = heatmap_data.get('subfolder_path', '')
-                    fig, ax = plt.subplots(figsize=(10, 7))
-                    plt.suptitle(f"{title}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                    result_list = heatmap_data['result']
-                    data_table = pd.DataFrame(result_list).pivot_table(index='x', columns='y', values='sharpe')
-                    sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                    ax.yaxis.set_tick_params(rotation=0)
-
-                    if show_heatmap:
-                        plt.show()
-                    else:
-                        heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
-                        fig.savefig(f"{heatmap_file_path}_all_time")
-                    plt.close(fig)
-
-                else:
-                    if total_heatmaps % 2 == 0:
-                        for i in range(0, total_heatmaps, 2):
-                            fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                            plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
-
-                            heatmap_data = heatmap_dict[i]
-                            title1 = heatmap_data['title']
-                            # subfolder_path1 = heatmap_data.get('subfolder_path', '')
-                            plt.suptitle(f"{title1}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                            result_list1 = heatmap_data['result']
-                            for result in result_list1: result['y'] = float(result['y'])  # Convert to float
-                            if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1): result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
-
-                            data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
-                            sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
                             ax1.yaxis.set_tick_params(rotation=0)
 
-                            if i + 1 < total_heatmaps:
-                                heatmap_data = heatmap_dict[i + 1]
-                                title2 = heatmap_data['title']
+                            if i + 1 < len(chunks):
                                 # subfolder_path2 = heatmap_data.get('subfolder_path', '')
-                                plt.suptitle(f"{title2}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                                result_list2 = heatmap_data['result']
-                                for result in result_list2: result['y'] = float(result['y'])
-                                if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
-
-                                data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+                                plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
+                                data_table2 = pd.DataFrame(chunks[i+1]).pivot_table(index='x', columns='y', values='sharpe')
                                 sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
                                 ax2.yaxis.set_tick_params(rotation=0)
-
                             if show_heatmap:
                                 plt.show()
                             else:
-                                heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
-                                fig.savefig(f"{heatmap_file_path}_all_time")
+                                file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
+                                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                                fig.savefig(f"{file_path}_overall")
                             plt.close(fig)
 
+
                     else:
-                        for i in range(0, total_heatmaps, 2):
-                            if i + 1 < total_heatmaps:
-                                fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                                plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+                        plt.suptitle(f"{title}\nFrom: {results[0]['since']} to {results[0]['end']}, Data quantity: {results[0]['data_quantity']}")
+                        fig, ax = plt.subplots(figsize=(10, 7))
+                        data_table = pd.DataFrame(heatmap_data).pivot_table(index='x', columns='y', values='sharpe')
+                        sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={
+                            'fontsize': 8})
+                        ax.yaxis.set_tick_params(rotation=0)
+                        plt.show()
+                        plt.close(fig)
 
-                                heatmap_data = heatmap_dict[i]
-                                title1 = heatmap_data['title']
-                                subfolder_path1 = heatmap_data.get('subfolder_path', '')
-                                plt.suptitle(f"{title1}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                                result_list1 = heatmap_data['result_list']
-                                for result in result_list1: result['y'] = float(result['y'])  # Convert to float
-                                if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1): result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
+                        if show_heatmap:
+                            plt.show()
+                        else:
+                            heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
+                            fig.savefig(f"{heatmap_file_path}_all_time")
+                        plt.close(fig)
 
-                                data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
-                                sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                                heatmap_data = heatmap_dict[i + 1]
-                                title2 = heatmap_data['title']
-                                plt.suptitle(f"{title2}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                                result_list2 = heatmap_data['result_list']
-                                for result in result_list2: result['y'] = float(result['y'])  # Convert to float
-                                if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
-                                data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
-                                sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-
-                                if show_heatmap:
-                                    plt.show()
-                                else:
-                                    heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
-                                    fig.savefig(f"{heatmap_file_path}_all_time")
-                                plt.close(fig)
-
-                            else:
-                                heatmap_data = heatmap_dict[i]
-                                title = heatmap_data['title']
-                                subfolder_path = heatmap_data.get('subfolder_path', '')
-                                fig, ax = plt.subplots(figsize=(10, 7))
-                                plt.suptitle(f"{title}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
-                                result_list3 = heatmap_data['result_list']
-                                data_table = pd.DataFrame(result_list3).pivot_table(index='x', columns='y', values='sharpe')
-                                sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
-                                if show_heatmap:
-                                    plt.show()
-                                else:
-                                    heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
-                                    fig.savefig(f"{heatmap_file_path}_all_time")
-                                plt.close(fig)
+        #         sys.exit()
+        #         # Create the heatmap
+        #         plt.figure(figsize=(10, 8))
+        #         sns.heatmap(heatmap_data, annot=True, cmap='coolwarm', cbar=True)
+        #
+        #         # Set titles and labels
+        #         plt.title('Heatmap of Sharpe Ratios')
+        #         plt.xlabel('y')
+        #         plt.ylabel('x')
+        #
+        #         # Show the heatmap
+        #         plt.show()
+        #         pass
+        #
+        #     if total_heatmaps == 1:
+        #         heatmap_data = results[0]
+        #         title = heatmap_data['title']
+        #         subfolder_path = heatmap_data.get('subfolder_path', '')
+        #         fig, ax = plt.subplots(figsize=(10, 7))
+        #         plt.suptitle(f"{title}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #         result_list = heatmap_data['result']
+        #         data_table = pd.DataFrame(result_list).pivot_table(index='x', columns='y', values='sharpe')
+        #         sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #         ax.yaxis.set_tick_params(rotation=0)
+        #
+        #         if show_heatmap:
+        #             plt.show()
+        #         else:
+        #             heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
+        #             fig.savefig(f"{heatmap_file_path}_all_time")
+        #         plt.close(fig)
+        #
+        #     else:
+        #         if total_heatmaps % 2 == 0:
+        #             for i in range(0, total_heatmaps, 2):
+        #                 fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+        #                 plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+        #
+        #                 heatmap_data = total_heatmaps[i]
+        #                 title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
+        #                 # subfolder_path1 = heatmap_data.get('subfolder_path', '')
+        #                 plt.suptitle(f"{title1}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                 result_list1 = heatmap_data['result']
+        #                 for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+        #                 if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1):
+        #                     result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
+        #
+        #                 data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+        #                 sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                 ax1.yaxis.set_tick_params(rotation=0)
+        #
+        #                 if i + 1 < total_heatmaps:
+        #                     heatmap_data = total_heatmaps[i + 1]
+        #                     title2 = heatmap_data['title']
+        #                     # subfolder_path2 = heatmap_data.get('subfolder_path', '')
+        #                     plt.suptitle(f"{title2}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                     result_list2 = heatmap_data['result']
+        #                     for result in result_list2: result['y'] = float(result['y'])
+        #                     if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+        #                            result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+        #
+        #                     data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+        #                     sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                     ax2.yaxis.set_tick_params(rotation=0)
+        #
+        #                 if show_heatmap:
+        #                     plt.show()
+        #                 else:
+        #                     heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+        #                     fig.savefig(f"{heatmap_file_path}_all_time")
+        #                 plt.close(fig)
+        #
+        #         else:
+        #             for i in range(0, total_heatmaps, 2):
+        #                 if i + 1 < total_heatmaps:
+        #                     fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+        #                     plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+        #
+        #                     heatmap_data = total_heatmaps[i]
+        #                     title1 = heatmap_data['title']
+        #                     subfolder_path1 = heatmap_data.get('subfolder_path', '')
+        #                     plt.suptitle(f"{title1}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                     result_list1 = heatmap_data['result_list']
+        #                     for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+        #                     if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+        #                            result_list1): result_list1 = [{**result,'y': f"{result['y']:.6f}"} for result in result_list1]
+        #
+        #                     data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+        #                     sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                     heatmap_data = total_heatmaps[i + 1]
+        #                     title2 = heatmap_data['title']
+        #                     plt.suptitle(f"{title2}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                     result_list2 = heatmap_data['result_list']
+        #                     for result in result_list2: result['y'] = float(result['y'])  # Convert to float
+        #                     if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in
+        #                            result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+        #                     data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+        #                     sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                     if show_heatmap:
+        #                         plt.show()
+        #                     else:
+        #                         heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+        #                         fig.savefig(f"{heatmap_file_path}_all_time")
+        #                     plt.close(fig)
+        #
+        #                 else:
+        #                     heatmap_data = total_heatmaps[i]
+        #                     title = heatmap_data['title']
+        #                     subfolder_path = heatmap_data.get('subfolder_path', '')
+        #                     fig, ax = plt.subplots(figsize=(10, 7))
+        #                     plt.suptitle(f"{title}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                     result_list3 = heatmap_data['result_list']
+        #                     data_table = pd.DataFrame(result_list3).pivot_table(index='x', columns='y', values='sharpe')
+        #                     sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #                     if show_heatmap:
+        #                         plt.show()
+        #                     else:
+        #                         heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
+        #                         fig.savefig(f"{heatmap_file_path}_all_time")
+        #                     plt.close(fig)
+        #
+        #
+        #
+        #
+        #     for heatmap in total_heatmaps:
+        #         title = f"{heatmap[0]['factor_currency']}|{heatmap[0]['asset_currency']}|{heatmap[0]['timeframe']}|{heatmap[0]['data_source']}|{heatmap[0]['endpoint']}|{heatmap[0]['indicator']}|{heatmap[0]['orientation']}|{heatmap[0]['action']}|{heatmap[0]['result']['x']}|{heatmap[0]['result']['y']}, sharpe {heatmap[0]['result']['sharpe']}, mdd {heatmap[0]['result']['mdd']}, pos_count {heatmap[0]['result']['pos_count']}"
+        #
+        #         for result in heatmap:
+        #             for data in result:
+        #                 title = f"{data['factor_currency']}|{data['asset_currency']}|{data['timeframe']}|{data['data_source']}|{data['endpoint']}|{data['indicator']}|{data['orientation']}|{data['action']}\nx {data['result']['x']}, y {data['result']['y']}, sharpe {data['result']['sharpe']}, mdd {data['result']['mdd']}, pos_count {data['result']['pos_count']}"
+        #                 pass
+        #
+        # for group_currency in all_results:
+        #     for heatmap_dict in group_currency:
+        #         total_heatmaps = len(heatmap_dict)
+        #
+        #         if total_heatmaps == 1:
+        #             heatmap_data = heatmap_dict[0]
+        #             title = heatmap_data['title']
+        #             subfolder_path = heatmap_data.get('subfolder_path', '')
+        #             fig, ax = plt.subplots(figsize=(10, 7))
+        #             plt.suptitle(f"{title}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #             result_list = heatmap_data['result']
+        #             data_table = pd.DataFrame(result_list).pivot_table(index='x', columns='y', values='sharpe')
+        #             sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #             ax.yaxis.set_tick_params(rotation=0)
+        #
+        #             if show_heatmap:
+        #                 plt.show()
+        #             else:
+        #                 heatmap_file_path = os.path.join(subfolder_path, f"{title}_file1")
+        #                 fig.savefig(f"{heatmap_file_path}_all_time")
+        #             plt.close(fig)
+        #
+        #         else:
+        #             if total_heatmaps % 2 == 0:
+        #                 for i in range(0, total_heatmaps, 2):
+        #                     fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+        #                     plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+        #
+        #                     heatmap_data = heatmap_dict[i]
+        #                     title1 = heatmap_data['title']
+        #                     # subfolder_path1 = heatmap_data.get('subfolder_path', '')
+        #                     plt.suptitle(f"{title1}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                     result_list1 = heatmap_data['result']
+        #                     for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+        #                     if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1): result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
+        #
+        #                     data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+        #                     sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                     ax1.yaxis.set_tick_params(rotation=0)
+        #
+        #                     if i + 1 < total_heatmaps:
+        #                         heatmap_data = heatmap_dict[i + 1]
+        #                         title2 = heatmap_data['title']
+        #                         # subfolder_path2 = heatmap_data.get('subfolder_path', '')
+        #                         plt.suptitle(f"{title2}\nFrom: {heatmap_data['since']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                         result_list2 = heatmap_data['result']
+        #                         for result in result_list2: result['y'] = float(result['y'])
+        #                         if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+        #
+        #                         data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+        #                         sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                         ax2.yaxis.set_tick_params(rotation=0)
+        #
+        #                     if show_heatmap:
+        #                         plt.show()
+        #                     else:
+        #                         heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+        #                         fig.savefig(f"{heatmap_file_path}_all_time")
+        #                     plt.close(fig)
+        #
+        #             else:
+        #                 for i in range(0, total_heatmaps, 2):
+        #                     if i + 1 < total_heatmaps:
+        #                         fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
+        #                         plt.subplots_adjust(left=0.06, bottom=0.12, right=1, top=0.9, wspace=0.15)
+        #
+        #                         heatmap_data = heatmap_dict[i]
+        #                         title1 = heatmap_data['title']
+        #                         subfolder_path1 = heatmap_data.get('subfolder_path', '')
+        #                         plt.suptitle(f"{title1}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                         result_list1 = heatmap_data['result_list']
+        #                         for result in result_list1: result['y'] = float(result['y'])  # Convert to float
+        #                         if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list1): result_list1 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list1]
+        #
+        #                         data_table1 = pd.DataFrame(result_list1).pivot_table(index='x', columns='y', values='sharpe')
+        #                         sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                         heatmap_data = heatmap_dict[i + 1]
+        #                         title2 = heatmap_data['title']
+        #                         plt.suptitle(f"{title2}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                         result_list2 = heatmap_data['result_list']
+        #                         for result in result_list2: result['y'] = float(result['y'])  # Convert to float
+        #                         if any(isinstance(i['y'], float) and 'e' in str(i['y']) for i in result_list2): result_list2 = [{**result, 'y': f"{result['y']:.6f}"} for result in result_list2]
+        #                         data_table2 = pd.DataFrame(result_list2).pivot_table(index='x', columns='y', values='sharpe')
+        #                         sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #
+        #                         if show_heatmap:
+        #                             plt.show()
+        #                         else:
+        #                             heatmap_file_path = os.path.join(subfolder_path1, f"{title1}_file{i + 1}")
+        #                             fig.savefig(f"{heatmap_file_path}_all_time")
+        #                         plt.close(fig)
+        #
+        #                     else:
+        #                         heatmap_data = heatmap_dict[i]
+        #                         title = heatmap_data['title']
+        #                         subfolder_path = heatmap_data.get('subfolder_path', '')
+        #                         fig, ax = plt.subplots(figsize=(10, 7))
+        #                         plt.suptitle(f"{title}\nFrom: {heatmap_data['start']} to {heatmap_data['end']}, Data quantity: {heatmap_data['data_quantity']}")
+        #                         result_list3 = heatmap_data['result_list']
+        #                         data_table = pd.DataFrame(result_list3).pivot_table(index='x', columns='y', values='sharpe')
+        #                         sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
+        #                         if show_heatmap:
+        #                             plt.show()
+        #                         else:
+        #                             heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
+        #                             fig.savefig(f"{heatmap_file_path}_all_time")
+        #                         plt.close(fig)
 
 
 

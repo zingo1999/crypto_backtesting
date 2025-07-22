@@ -5,27 +5,29 @@ from data_analysis import DataAnalysis
 
 if __name__ == '__main__':
 
-    factor_currency = ''
+    factor_currency = 'btc'
     asset_currency  = 'btc'
-    action          = ''
-    indicator       = ''
+    action          = 'long_only'
+    indicator       = 'bband'
     orientation     = ''
     since           = '2020-05-01'
     # since           = '2025-06-01'
-    timeframe       = '1h'
+    timeframe       = ''
 
-    data_source     = 'exchange'        # glassnode
-    endpoint        = 'price'       # active_1m_3m options_25delta_skew_3_months implied options_open_interest_distribution
-    exchange_name   = 'bybit'
+    data_source     = 'glassnode'        # glassnode exchange
+    endpoint        = 'options_25delta_skew_1'       # active_1m_3m options_25delta_skew_3_months implied options_open_interest_distribution
+    exchange_name   = 'binance'
     product_type    = 'linear'
-
-    update_mode         = True
-    minimum_sharpe      = 0.5
 
     max_threshold       = 0
     number_of_interval  = 0
 
-    cross_validate = False
+    update_mode         = True
+
+    minimum_sharpe      = 1.3
+    position_count      = False
+    walk_forward        = False
+    cross_validate      = True
 
     kwargs = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
 
