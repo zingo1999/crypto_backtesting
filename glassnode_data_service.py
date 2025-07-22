@@ -64,7 +64,9 @@ class GlassnodeDataService:
         since = self.since if not isinstance(self.since, str) else int(pd.to_datetime(self.since).timestamp())
         if since > 1_00_000_000_000: int(since / 1000)
         if self.timeframe == '1d': self.timeframe = '24h'
-        timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
+        # timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
+        if self.timeframe not in ['10m', '1h', '24h']: return
+        else: timeframe = self.timeframe
 
         try:
             endpoint_path = metadata_df['path'].iloc[0]

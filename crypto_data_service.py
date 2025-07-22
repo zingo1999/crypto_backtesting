@@ -38,18 +38,20 @@ class CryptoDataService:
         self.factor_currency_list = [self.factor_currency.upper()] if self.factor_currency else ['BTC', 'ETH', 'SOL']
         self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi']
         self.orientation_list = [self.orientation] if self.orientation else ['momentum', 'reversion']
-        self.timeframe_list = [self.timeframe] if self.timeframe else ['10m', '1h', '1d']
+        self.timeframe_list = [self.timeframe] if self.timeframe else ['24h', '12h', '1h']  # ['10m', '1h', '1d']
 
-    def get_factor_dataframe(self):
+    def get_factor_dataframe(self,):
         factor_df = pd.DataFrame()
         if self.data_source == 'exchange':
-            factor_df = CryptoExchangeDataService(self.factor_currency, **self.kwargs).get_historical_data()
+            kwargs = self.kwargs.copy()
+            kwargs['asset_currency'] = self.factor_currency
+            factor_df = CryptoExchangeDataService(**kwargs).get_historical_data()
         elif self.data_source == 'glassnode':
             factor_df = GlassnodeDataService(self.kwargs).fetch_data()
         return factor_df
 
-    def get_price_dataframe(self):
-        exchange_data = CryptoExchangeDataService(self.asset_currency, **self.kwargs)
+    def get_price_dataframe(self,):
+        exchange_data = CryptoExchangeDataService(**self.kwargs)
         price_df = exchange_data.get_historical_data(True)
         return price_df
 
@@ -101,18 +103,17 @@ class CryptoDataService:
 
     def generate_all_backtest_results(self, ):
         all_results = {}
-        for timeframe in self.timeframe_list:
-            for asset_currency in self.asset_currency_list:
-                price_df = CryptoExchangeDataService(asset_currency, **self.kwargs).get_historical_data(True)
+        for asset_currency in self.asset_currency_list:
+            for timeframe in self.timeframe_list:
+                self.kwargs.update({
+                    'asset_currency': asset_currency,
+                    'timeframe': timeframe, })
+                price_df = CryptoExchangeDataService(**self.kwargs).get_historical_data(True)
                 endpoint_list = self.get_endpoint_list()
                 for endpoint in endpoint_list:
                     self.kwargs.update({'endpoint': endpoint})
                     for factor_currency in self.factor_currency_list:
-                        self.kwargs.update({
-                            'asset_currency': asset_currency,
-                            'factor_currency': factor_currency,
-                            'timeframe': timeframe,
-                        })
+                        self.kwargs.update({'factor_currency': factor_currency})
                         backtest_df = CryptoDataService(self.kwargs).create_backtest_dataframe(price_df.copy())
                         if backtest_df.empty: continue
                         print(f"{backtest_df.tail(2)}\n")
@@ -127,40 +128,46 @@ class CryptoDataService:
                                         'asset_currency': asset_currency,
                                         'backtest_df': backtest_df,
                                         'data_source': self.data_source,
-                                        # 'endpoint_path': endpoint_path,
                                         'endpoint': endpoint,
                                         'factor_currency': factor_currency,
                                         'indicator': indicator,
                                         'lookback_list': lookback_list,
                                         'orientation': orientation,
-                                        # 'max_recovery_days': max_recovery_days,
                                         'minimum_sharpe': self.minimum_sharpe,
-                                        # 'minimum_trades': minimum_trades,
                                         # 't_plus': t_plus,
                                         'strategy': f"{indicator}{orientation}{action}",
                                         'threshold_list': threshold_list,
                                         'timeframe': timeframe,
                                         'title': f"{factor_currency}{asset_currency}{self.data_source}{endpoint}{timeframe}{indicator}{orientation}_{action}",}
                                     backtest_combos.append(para_combination)
+                        del lookback_list, threshold_list
                         if len(backtest_combos) > 1: backtest_results = Utilities.run_in_parallel(BacktestEngine.performance_evaluation, backtest_combos)
                         else: backtest_results = [BacktestEngine.performance_evaluation(backtest_combos[0])]
                         if any(element is not None for element in backtest_results):
                             backtest_results = [result for result in backtest_results if result is not None]
-                            all_results.update({factor_currency: backtest_results})
+                            if asset_currency not in all_results: all_results[asset_currency] = []
+                            all_results[asset_currency].append(backtest_results)
+                            del backtest_results
         if all_results:
-            backtest_results_folder = 'backtest_results'
-            os.makedirs(backtest_results_folder, exist_ok=True)
-            subfolder_path = os.path.join(backtest_results_folder, f"{self.asset_currency}")
+            asset_currency_keys = list(all_results.keys())
+            for asset_currency in asset_currency_keys:
+                backtest_results_folder = f"backtest_results/{asset_currency}"
+                os.makedirs(backtest_results_folder, exist_ok=True)
+                subfolder_path = os.path.join(backtest_results_folder, f"{asset_currency}")
+                different_timeframe_results = all_results[asset_currency]
+                extracted_results = []
+                for different_stratgy_results in different_timeframe_results:
+                    for strategy_data_point in different_stratgy_results:
+                        for data in strategy_data_point:
+                            extracted_results.append(data['result'])
+                results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
 
-            extracted_results = []
-            factor_currency_keys = list(all_results.keys())
-            for currency in factor_currency_keys:
-                data_entries = all_results[currency]
-                for entry in data_entries:
-                    for data_point in entry:
-                        extracted_results.append(data_point['result'])
-            results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
-            results_df.to_csv(f"{subfolder_path}.csv")
-            print(results_df.head(5))
-            return all_results
+                file_path = f"{subfolder_path}.csv"
+                if os.path.exists(file_path):
+                    existing_df = pd.read_csv(file_path, index_col=0)
+                    results_df = pd.concat([existing_df, results_df], ignore_index=True).drop_duplicates(subset='strategy', keep='last')
+                results_df.to_csv(file_path)
+                results_df = results_df[results_df['sharpe'] >= self.minimum_sharpe].reset_index(drop=True)
+                print(results_df.head(5))
+        return all_results
 
