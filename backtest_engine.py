@@ -1,5 +1,4 @@
 
-
 import numpy as np
 import pandas as pd
 
@@ -85,14 +84,14 @@ class BacktestEngine:
             df['pos'] = bband_action_map[strategy](df['z'])
 
         elif indicator == 'rsi':
-            delta = df['factor'].diff(1)
-            delta = delta.fillna(0)
-            gain = delta.clip(lower=0)
-            loss = -delta.clip(upper=0)
-            avg_gain = gain.rolling(x).mean()
-            avg_loss = loss.rolling(x).mean()
-            rs = avg_gain / avg_loss
-            df['z'] = 100 - (100 / (1 + rs))
+            df['delta'] = df['factor'].diff(1)
+            df['delta'] = df['delta'].astype(float).fillna(0)
+            df['positive'] = df['delta'].clip(lower=0)
+            df['negative'] = df['delta'].clip(upper=0)
+            df['average_gain'] = df['positive'].rolling(x).mean()
+            df['average_loss'] = abs(df['negative'].rolling(x).mean())
+            df['relative_strength'] = df['average_gain'] / df['average_loss']
+            df['z'] = 100 - (100 / (1 + df['relative_strength']))
             upper_bond, lower_bond = 50 + y, 50 - y
             rsi_action_map = {
                 'momentum_long_short': lambda z: np.where(z > upper_bond, 1, np.where(z < lower_bond, -1, 0)),
@@ -180,14 +179,10 @@ class BacktestEngine:
             df['slow_ma'] = df['factor'].rolling(int(y)).mean()
 
             cross_ma_action_dict = {
-                'momentum_long_short': np.where(df['fast_ma'] > df['slow_ma'],
-                                                1,
-                                                np.where(df['fast_ma'] < df['slow_ma'], -1, 0)),
+                'momentum_long_short': np.where(df['fast_ma'] > df['slow_ma'], 1, np.where(df['fast_ma'] < df['slow_ma'], -1, 0)),
                 'momentum_long_only': np.where(df['fast_ma'] > df['slow_ma'], 1, 0),
                 'momentum_short_only': np.where(df['fast_ma'] < df['slow_ma'], -1, 0),
-                'reversion_long_short': np.where(df['fast_ma'] > df['slow_ma'],
-                                                 -1,
-                                                 np.where(df['fast_ma'] < df['slow_ma'], 1, 0)),
+                'reversion_long_short': np.where(df['fast_ma'] > df['slow_ma'], -1, np.where(df['fast_ma'] < df['slow_ma'], 1, 0)),
                 'reversion_long_only': np.where(df['fast_ma'] > df['slow_ma'], -1, 0),
                 'reversion_short_only': np.where(df['fast_ma'] < df['slow_ma'], 1, 0), }
             df['pos'] = cross_ma_action_dict[strategy]
@@ -196,7 +191,7 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, minimum_sharpe, orientation, threshold_list, timeframe, **kwargs):
+        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, minimum_sharpe=1, period='overall', **kwargs):
             save_result = False
             backtest_dataframe_key = f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}"
             result_list = []
@@ -283,17 +278,13 @@ class BacktestEngine:
                             'data_quantity': len(df),
                             'end': df.index[-1],
                             'since': df.index[0],
-                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|overall"
-,
+                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|{period}"
                     })
 
                     if sharpe >= minimum_sharpe:
                         save_result = True
 
             if save_result is True:
-                all_all = []
-                for ae in result_list:
-                    all_all.append(ae['result'])
                 return result_list
 
         result = strategy_effectiveness(**backtest_combos)

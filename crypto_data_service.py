@@ -27,10 +27,13 @@ class CryptoDataService:
         self.indicator = params.get('indicator', '')
         self.kwargs = params
         self.max_threshold = params.get('max_threshold', None)
-        self.minimum_sharpe = params.get('minimum_sharpe', None)
+        # self.minimum_sharpe = params.get('minimum_sharpe', None)
         self.number_of_interval = params.get('number_of_interval', None)
         self.orientation = params.get('orientation', '')
         self.timeframe = params.get('timeframe', '')
+        self.walk_forward = params.get('walk_forward', False)
+        self.x = params.get('x', None)
+        self.y = params.get('y', None)
 
         # 初始化其他屬性
         self.action_list = [self.action] if self.action else ['long_short', 'long_only', 'short_only']
@@ -39,6 +42,8 @@ class CryptoDataService:
         self.indicator_list = [self.indicator] if self.indicator else ['bband', 'rsi']
         self.orientation_list = [self.orientation] if self.orientation else ['momentum', 'reversion']
         self.timeframe_list = [self.timeframe] if self.timeframe else ['24h', '12h', '1h']  # ['10m', '1h', '1d']
+        self.lookback_list = [self.x] if self.x else []  # ['10m', '1h', '1d']
+        self.threshold_list = [self.y] if self.y else []  # ['10m', '1h', '1d']
 
     def get_factor_dataframe(self,):
         factor_df = pd.DataFrame()
@@ -117,10 +122,10 @@ class CryptoDataService:
                         backtest_df = CryptoDataService(self.kwargs).create_backtest_dataframe(price_df.copy())
                         if backtest_df.empty: continue
                         print(f"{backtest_df.tail(2)}\n")
-                        lookback_list = Utilities.generate_lookback_lists(backtest_df.copy())
+                        lookback_list = Utilities.generate_lookback_lists(backtest_df.copy()) if not self.lookback_list else self.lookback_list
                         backtest_combos = []
                         for indicator in self.indicator_list:
-                            threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator, self.max_threshold, self.number_of_interval)
+                            threshold_list = Utilities.generate_threshold_list(backtest_df.copy(), indicator, self.max_threshold, self.number_of_interval) if not self.threshold_list else self.threshold_list
                             for orientation in self.orientation_list:
                                 for action in self.action_list:
                                     para_combination = {
@@ -133,12 +138,13 @@ class CryptoDataService:
                                         'indicator': indicator,
                                         'lookback_list': lookback_list,
                                         'orientation': orientation,
-                                        'minimum_sharpe': self.minimum_sharpe,
+                                        # 'minimum_sharpe': self.minimum_sharpe,
                                         # 't_plus': t_plus,
                                         'strategy': f"{indicator}{orientation}{action}",
                                         'threshold_list': threshold_list,
                                         'timeframe': timeframe,
-                                        'title': f"{factor_currency}{asset_currency}{self.data_source}{endpoint}{timeframe}{indicator}{orientation}_{action}",}
+                                        'title': f"{factor_currency}{asset_currency}{self.data_source}{endpoint}{timeframe}{indicator}{orientation}_{action}",
+                                    }
                                     backtest_combos.append(para_combination)
                         del lookback_list, threshold_list
                         if len(backtest_combos) > 1: backtest_results = Utilities.run_in_parallel(BacktestEngine.performance_evaluation, backtest_combos)
@@ -153,21 +159,22 @@ class CryptoDataService:
             for asset_currency in asset_currency_keys:
                 backtest_results_folder = f"backtest_results/{asset_currency}"
                 os.makedirs(backtest_results_folder, exist_ok=True)
-                subfolder_path = os.path.join(backtest_results_folder, f"{asset_currency}")
+                subfolder_path = os.path.join(backtest_results_folder, f"{asset_currency}_result")
                 different_timeframe_results = all_results[asset_currency]
                 extracted_results = []
                 for different_stratgy_results in different_timeframe_results:
                     for strategy_data_point in different_stratgy_results:
                         for data in strategy_data_point:
                             extracted_results.append(data['result'])
-                results_df = pd.DataFrame(extracted_results).sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+                results_df = pd.DataFrame(extracted_results)
 
                 file_path = f"{subfolder_path}.csv"
                 if os.path.exists(file_path):
                     existing_df = pd.read_csv(file_path, index_col=0)
                     results_df = pd.concat([existing_df, results_df], ignore_index=True).drop_duplicates(subset='strategy', keep='last')
+
+                results_df = results_df[results_df['sharpe'] >= 1].sort_values(by='sharpe', ascending=False).reset_index(drop=True)
                 results_df.to_csv(file_path)
-                results_df = results_df[results_df['sharpe'] >= self.minimum_sharpe].reset_index(drop=True)
                 print(results_df.head(5))
         return all_results
 

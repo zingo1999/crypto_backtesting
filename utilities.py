@@ -91,7 +91,7 @@ class Utilities:
         return lookback_list
 
     @classmethod
-    def generate_threshold_list(cls, df: pd.DataFrame, indicator: str, max_threshold: float, number_of_intervals: int) -> np.ndarray:
+    def generate_threshold_list(cls, df: pd.DataFrame, indicator: str, max_threshold: float = None, number_of_intervals: int = None) -> np.ndarray:
         """
         Generates a list of threshold values based on the given indicator and parameters.
 
@@ -239,7 +239,8 @@ class Utilities:
         return list(unique_backtest_keys), filtered_results, result_data_list
 
     @classmethod
-    def generate_heatmap(cls, all_results, show_heatmap=False):
+    def generate_heatmap(cls, all_results={}, show_heatmap=False):
+        target = 'sharpe'
 
         asset_currency_list = list(all_results.keys())
         for asset_currency in asset_currency_list:
@@ -261,14 +262,14 @@ class Utilities:
                         if len(chunks) % 2 != 0: chunks.pop()
                         for i in range(0, len(chunks), 2):
                             fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(16, 10))
-                            data_table1 = pd.DataFrame(chunks[i]).pivot_table(index='x', columns='y', values='sharpe')
+                            data_table1 = pd.DataFrame(chunks[i]).pivot_table(index='x', columns='y', values=target)
                             sns.heatmap(data_table1, ax=ax1, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
                             ax1.yaxis.set_tick_params(rotation=0)
 
                             if i + 1 < len(chunks):
                                 # subfolder_path2 = heatmap_data.get('subfolder_path', '')
                                 plt.suptitle(f"{title}\nFrom: {heatmap[0]['since']} to {heatmap[0]['end']}, Data quantity: {heatmap[0]['data_quantity']}")
-                                data_table2 = pd.DataFrame(chunks[i+1]).pivot_table(index='x', columns='y', values='sharpe')
+                                data_table2 = pd.DataFrame(chunks[i+1]).pivot_table(index='x', columns='y', values=target)
                                 sns.heatmap(data_table2, ax=ax2, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
                                 ax2.yaxis.set_tick_params(rotation=0)
                             if show_heatmap:
@@ -283,9 +284,8 @@ class Utilities:
                     else:
                         plt.suptitle(f"{title}\nFrom: {results[0]['since']} to {results[0]['end']}, Data quantity: {results[0]['data_quantity']}")
                         fig, ax = plt.subplots(figsize=(10, 7))
-                        data_table = pd.DataFrame(heatmap_data).pivot_table(index='x', columns='y', values='sharpe')
-                        sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={
-                            'fontsize': 8})
+                        data_table = pd.DataFrame(heatmap_data).pivot_table(index='x', columns='y', values=target)
+                        sns.heatmap(data_table, ax=ax, annot=True, fmt='g', cmap='Greens', annot_kws={'fontsize': 8})
                         ax.yaxis.set_tick_params(rotation=0)
                         plt.show()
                         plt.close(fig)
@@ -545,6 +545,25 @@ class Utilities:
         #                             heatmap_file_path = os.path.join(subfolder_path, f"{title}_file{i + 1}")
         #                             fig.savefig(f"{heatmap_file_path}_all_time")
         #                         plt.close(fig)
+
+    @classmethod
+    def simple_filtering(cls, kwargs):
+        asset_currency = kwargs['asset_currency']
+        asset_currency_list = [asset_currency] if asset_currency else ['BTC', 'ETH', 'SOL']
+        for asset_currency in asset_currency_list:
+            file_path = f"backtest_results/{asset_currency}/{asset_currency}_result.csv"
+            if os.path.exists(file_path):
+                result_df = pd.read_csv(file_path, index_col=0)
+                result_df = result_df[(result_df['sharpe'] > kwargs['minimum_sharpe']) & (result_df['sharpe'] >= result_df['benchmark'] + 0.2)].reset_index(drop=True)
+                file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+                if os.path.exists(file_path):
+                    existing_df = pd.read_csv(file_path, index_col=0)
+                    result_df = pd.concat([existing_df, result_df], ignore_index=True).drop_duplicates(subset='strategy', keep='first').sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+                result_df.to_csv(file_path)
+                pass
+
+
+
 
 
 
