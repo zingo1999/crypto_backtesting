@@ -93,11 +93,11 @@ class WalkForwardAnalysis:
 
     def run_walk_forward_analysis(self):
         for asset_currency in self.asset_currency_list:
+            self.kwargs['asset_currency'] = asset_currency
             file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0)
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
-                self.kwargs['asset_currency'] = asset_currency
                 walk_forward_results = self.prepare_and_execute_walk_forward(result_df, self.kwargs)
                 wf_columns = (walk_forward_results.columns)[:-1]
                 result_df = result_df.drop(columns=wf_columns, errors='ignore')

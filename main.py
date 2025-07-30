@@ -26,11 +26,12 @@ minimum_sharpe  = 1
 position_count  = False
 
 ##### Mode #####
-backtest_mode       = True
+backtest_mode       = False
 cross_validate      = True
+parameter_plateau   = False
 show_equity_curve   = False
 show_heatmap        = False
-walk_forward        = True
+walk_forward        = False
 
 specific_task = ''
 

@@ -193,11 +193,11 @@ class CrossValidator:
 
     def process_backtest_results(self):
         for asset_currency in self.asset_currency_list:
+            self.kwargs['asset_currency'] = asset_currency
             file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
             if os.path.exists(file_path):
-                result_df = pd.read_csv(file_path, index_col=0).dropna().reset_index(drop=True)
+                result_df = pd.read_csv(file_path, index_col=0).query('parameter_plateau').dropna()
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].reset_index(drop=True)
-                self.kwargs['asset_currency'] = asset_currency
                 cv_result_df = self.run_cross_validation(result_df, self.kwargs)
                 cv_columns = (cv_result_df.columns)[:-1]
                 result_df = result_df.drop(columns=cv_columns, errors='ignore')
@@ -207,7 +207,7 @@ class CrossValidator:
                 result_df = result_df[cols]
                 result_df = result_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
 
-                # file_path = f"backtest_results/{asset_currency}/{asset_currency}_cross_validation_result.csv"
+                file_path = f"backtest_results/{asset_currency}/{asset_currency}_optimized_result.csv"
                 result_df.to_csv(file_path)
                 print(result_df.head())
                 pass
