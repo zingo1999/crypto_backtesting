@@ -3,13 +3,13 @@
 from data_analysis import DataAnalysis
 
 
-factor_currency = ''
-asset_currency  = 'sol'
+factor_currency = 'eth'
+asset_currency  = 'btc'
 action          = 'long_only'
-indicator       = ''
-orientation     = ''
+indicator       = 'bband'
+orientation     = 'momentum'
 since           = '2020-05-01'
-timeframe       = ''
+timeframe       = '24h'
 x               = 0
 y               = 0
 
@@ -27,11 +27,13 @@ position_count  = False
 
 ##### Mode #####
 backtest_mode       = False
-cross_validate      = True
+cross_validate      = False
 parameter_plateau   = False
+walk_forward        = False
+
 show_equity_curve   = False
 show_heatmap        = False
-walk_forward        = False
+target_metric       = 'calmar'
 
 specific_task = ''
 
