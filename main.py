@@ -5,11 +5,11 @@ from analysis_tools.data_analysis import DataAnalysis
 
 factor_currency = 'btc'
 asset_currency  = 'btc'
-action          = 'long_only'  # long_short/long_only/short_only
+action          = 'long_short'  # long_short/long_only/short_only
 indicator       = ''    # bband/rsi
 orientation     = ''    # momentum/reversion
-since           = '2020-05-01'  # 2020-05-01
-timeframe       = ''       # 24h/12h/6h/3h/1h/30m/15m/10m/5m/3m
+since           = '2024-07-01'  # 2020-05-01
+timeframe       = '5m'       # 24h/12h/6h/3h/1h/30m/15m/10m/5m/3m
 x               = 0
 y               = 0
 
@@ -31,11 +31,12 @@ cross_validate      = True
 parameter_plateau   = True
 walk_forward        = True
 
-generate_equity_curve   = True
-show_equity_curve       = False
+generate_equity_curve = True
+show_equity_curve     = False
 
-show_heatmap        = False
-target_metric       = 'sharpe'  # sharpe, mdd, calmar,
+generate_heatmap = False
+show_heatmap     = False
+target_metric    = 'sharpe'  # sharpe, mdd, calmar,
 
 dash_board = False
 
