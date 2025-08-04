@@ -1,12 +1,10 @@
 import pandas as pd
 import os
-from tqdm import tqdm
-
 
 from backtest_engine import BacktestEngine
 from crypto_exchange_data_service import CryptoExchangeDataService
-from glassnode_data_service import GlassnodeDataService
-from utilities import Utilities
+from analysis_tools.glassnode_data_service import GlassnodeDataService
+from analysis_tools.utilities import Utilities
 
 
 class CryptoDataService:

@@ -1,17 +1,15 @@
 import os
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
 
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Lasso, Ridge
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
 
-from crypto_data_service import CryptoDataService
-from crypto_exchange_data_service import CryptoExchangeDataService
-from utilities import Utilities
+from analysis_tools.crypto_data_service import CryptoDataService
+from analysis_tools.crypto_exchange_data_service import CryptoExchangeDataService
+from analysis_tools.utilities import Utilities
 
 
 class CrossValidator:

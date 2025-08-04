@@ -2,16 +2,14 @@
 
 
 # Third-party imports
-import pandas as pd
 
 # Custom imports
-from cross_validator import CrossValidator
+from overfitting_prevention.cross_validator import CrossValidator
 from crypto_data_service import CryptoDataService
-from playground_dashboard import DashBoardGenerator
-from generate_image import EquityCurveGenerator, HeatmapGenerator
-from parameter_plateau import ParameterPlateau
-from utilities import Utilities
-from walk_forward_analysis import WalkForwardAnalysis
+from analysis_tools.generate_image import EquityCurveGenerator, HeatmapGenerator
+from overfitting_prevention.parameter_plateau import ParameterPlateau
+from analysis_tools.utilities import Utilities
+from overfitting_prevention.walk_forward_analysis import WalkForwardAnalysis
 
 
 class DataAnalysis:

@@ -1,13 +1,12 @@
 
 import os
 
-import numpy as np
 import pandas as pd
 
-from backtest_engine import BacktestEngine
-from crypto_data_service import CryptoDataService
-from crypto_exchange_data_service import CryptoExchangeDataService
-from utilities import Utilities
+from analysis_tools.backtest_engine import BacktestEngine
+from analysis_tools.crypto_data_service import CryptoDataService
+from analysis_tools.crypto_exchange_data_service import CryptoExchangeDataService
+from analysis_tools.utilities import Utilities
 
 
 class ParameterPlateau:
