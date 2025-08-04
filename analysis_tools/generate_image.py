@@ -154,8 +154,8 @@ class EquityCurveGenerator:
         self.asset_currency_list = ['BTC', 'ETH', 'SOL'] if not asset_currency else [asset_currency]
         self.kwargs = kwargs
 
-    def generate_equity_curves(self, all_results, equity_curve_data=False):
-        if not all_results: all_results = self.load_all_results()
+    def generate_equity_curves(self, equity_curve_data=False):
+        all_results = self.load_all_results()
         asset_currency_list = list(all_results.keys())
         self.process_results(all_results, asset_currency_list, equity_curve_data)
 
@@ -163,13 +163,15 @@ class EquityCurveGenerator:
     def load_all_results(self, ):
         all_results = {}
         for asset_currency in self.asset_currency_list:
+            backtest_task_results = []
             self.kwargs['asset_currency'] = asset_currency
             file_path = f"backtest_results/{asset_currency}/{asset_currency}_optimized_result.csv"
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0)
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
                 backtest_task_results = self.prepare_backtest_tasks(result_df, self.kwargs)
-                all_results.update({asset_currency: backtest_task_results})
+                # result_list.append(backtest_task_results)
+            all_results.update({asset_currency: backtest_task_results})
         return all_results
 
     @staticmethod
