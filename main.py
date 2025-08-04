@@ -5,7 +5,7 @@ from analysis_tools.data_analysis import DataAnalysis
 
 factor_currency = 'btc'
 asset_currency  = 'btc'
-action          = 'long_short'  # long_short/long_only/short_only
+action          = 'long_only'  # long_short/long_only/short_only
 indicator       = ''    # bband/rsi
 orientation     = ''    # momentum/reversion
 since           = '2020-05-01'  # 2020-05-01

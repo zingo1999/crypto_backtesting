@@ -195,7 +195,10 @@ class CrossValidator:
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0).query('parameter_plateau').dropna()
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].reset_index(drop=True)
+                if result_df.empty: return
                 cv_result_df = self.run_cross_validation(result_df, self.kwargs)
+                if cv_result_df.empty:
+                    return
                 cv_columns = cv_result_df.columns[:-1]
                 result_df = result_df.drop(columns=cv_columns, errors='ignore')
 

@@ -42,6 +42,6 @@ class DataAnalysis:
         if self.cross_validate:
             CrossValidator(self.kwargs['asset_currency'], self.kwargs).process_backtest_results()
 
-        HeatmapGenerator(self.kwargs['asset_currency'], self.kwargs).generate_all_heatmaps(all_results, self.kwargs['show_heatmap'], self.kwargs['target_metric'])
+        # HeatmapGenerator(self.kwargs['asset_currency'], self.kwargs).generate_all_heatmaps(all_results, self.kwargs['show_heatmap'], self.kwargs['target_metric'])
         if self.generate_equity_curve:
-            EquityCurveGenerator(self.kwargs['asset_currency'], self.kwargs).generate_equity_curves(all_results, self.kwargs['show_equity_curve'])
+            EquityCurveGenerator(self.kwargs['asset_currency'], self.kwargs).generate_equity_curves(self.kwargs['show_equity_curve'])
