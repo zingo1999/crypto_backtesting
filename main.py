@@ -26,10 +26,10 @@ minimum_sharpe  = 1
 position_count  = False
 
 ##### Mode #####
-backtest_mode       = False
-cross_validate      = False
-parameter_plateau   = False
-walk_forward        = False
+backtest_mode       = True
+cross_validate      = True
+parameter_plateau   = True
+walk_forward        = True
 
 generate_equity_curve   = True
 show_equity_curve       = False
