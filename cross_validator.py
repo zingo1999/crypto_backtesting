@@ -172,20 +172,19 @@ class CrossValidator:
         }).create_backtest_dataframe(CryptoExchangeDataService(**{**kwargs, 'timeframe': key_parts[2]}).get_historical_data(True)) for strategy_key in strategy_key_list for key_parts in [strategy_key.split('|')]}
 
         tasks = []
-        for i in range(len(result_df)):
-            data = result_df.iloc[i]
-            backtest_dataframe_key = '|'.join(data['strategy'].rsplit('|', 5)[:-5])
+        for _, row in result_df.iterrows():
+            backtest_dataframe_key = '|'.join(row['strategy'].rsplit('|', 5)[:-5])
             backtest_df = backtest_dataframe_map[backtest_dataframe_key].copy()
             tasks.append({
-                'action': data['strategy'].split('|')[-3],
+                'action': row['strategy'].split('|')[-3],
                 'backtest_df': backtest_df,
-                'indicator': data['strategy'].split('|')[-5],
-                'orientation': data['strategy'].split('|')[-4],
-                'sharpe': data['sharpe'],
-                'strategy': data['strategy'],
-                'timeframe': data['strategy'].split('|')[2],
-                'x': data['x'],
-                'y': data['y'],
+                'indicator': row['strategy'].split('|')[-5],
+                'orientation': row['strategy'].split('|')[-4],
+                'sharpe': row['sharpe'],
+                'strategy': row['strategy'],
+                'timeframe': row['strategy'].split('|')[2],
+                'x': row['x'],
+                'y': row['y'],
             })
         if tasks:
             cross_validation_result = (Utilities.run_in_parallel(CrossValidator.evaluate_backtest_results, tasks) if len(tasks) > 1 else [CrossValidator.evaluate_backtest_results(tasks[0])])
@@ -199,7 +198,7 @@ class CrossValidator:
                 result_df = pd.read_csv(file_path, index_col=0).query('parameter_plateau').dropna()
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].reset_index(drop=True)
                 cv_result_df = self.run_cross_validation(result_df, self.kwargs)
-                cv_columns = (cv_result_df.columns)[:-1]
+                cv_columns = cv_result_df.columns[:-1]
                 result_df = result_df.drop(columns=cv_columns, errors='ignore')
 
                 result_df = pd.merge(result_df, cv_result_df, on='strategy', how='inner')

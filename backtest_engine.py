@@ -191,7 +191,7 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, minimum_sharpe=1, period='overall', **kwargs):
+        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, generate_equity_curve=False, minimum_sharpe=1, period='overall', **kwargs):
             save_result = False
             backtest_dataframe_key = f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}"
             result_list = []
@@ -241,6 +241,7 @@ class BacktestEngine:
                     sharpe = round(avg_return / return_sd * np.sqrt(timeunit), 2) if annual_return and return_sd else 0
                     calmar = round(avg_return * timeunit / mdd, 2) if mdd != 0 else 0
 
+                    benchmark_cumu = round(df['benchmark_cumu'].iloc[-1], 3)
                     benchmark_mean = df['benchmark'].iloc[x - 1:].mean()
                     benchmark_std = df['benchmark'].iloc[x - 1:].std()
                     benchmark_sharpe = round(benchmark_mean / benchmark_std * np.sqrt(timeunit), 2) if benchmark_mean and benchmark_std else 0
@@ -248,6 +249,32 @@ class BacktestEngine:
                     if win_rate >= 0.75: print(f"{parameters['indicator']}_{parameters['orientation']}_{x}_{y} - win rate {round(win_rate * 100, 3)}%")
 
                     if isinstance(y, float) and 'e' in f"{y}": y = f"{y:.10f}".rstrip('0')
+
+                    if generate_equity_curve is True:
+                        # return {
+                        #     'backtest_df': df,
+                        #     'benchmark_cumu': benchmark_cumu,
+                        #     'benchmark_sharpe': benchmark_sharpe,
+                        #     'calmar': calmar,
+                        #     'sharpe': sharpe,
+                        #     'max_drawdown_days': max_drawdown_days,
+                        #     'mdd': mdd,
+                        #     'pos_count': pos_count,
+                        #     'trades': trades,
+                        #     'win_rate': win_rate,
+                        # }
+                        return {
+                            'backtest_df': df[['cumu', 'dd', 'benchmark_cumu']].dropna(),
+                            'calmar': calmar,
+                            'max_drawdown_days': max_drawdown_days,
+                            'mdd': mdd,
+                            'pos_count': pos_count,
+                            'sharpe': sharpe,
+                            'trades': trades,
+                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|{period}",
+                            'x': x,
+                            'y': y,
+                        }
 
                     result = {
                         'x': x,
@@ -290,6 +317,7 @@ class BacktestEngine:
         result = strategy_effectiveness(**backtest_combos)
         if result:
             return result
+
 
 
 

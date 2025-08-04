@@ -3,13 +3,13 @@
 from data_analysis import DataAnalysis
 
 
-factor_currency = 'eth'
+factor_currency = ''
 asset_currency  = 'btc'
 action          = 'long_only'
-indicator       = 'bband'
-orientation     = 'momentum'
+indicator       = ''
+orientation     = ''
 since           = '2020-05-01'
-timeframe       = '24h'
+timeframe       = ''
 x               = 0
 y               = 0
 
@@ -31,9 +31,13 @@ cross_validate      = False
 parameter_plateau   = False
 walk_forward        = False
 
-show_equity_curve   = False
+generate_equity_curve   = True
+show_equity_curve       = False
+
 show_heatmap        = False
-target_metric       = 'calmar'
+target_metric       = 'sharpe'  # sharpe, mdd, calmar,
+
+dash_board = False
 
 specific_task = ''
 

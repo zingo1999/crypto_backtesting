@@ -1,6 +1,7 @@
 
 import os
 
+import numpy as np
 import pandas as pd
 
 from backtest_engine import BacktestEngine
@@ -14,8 +15,28 @@ class ParameterPlateau:
         self.asset_currency_list = ['BTC', 'ETH', 'SOL'] if not asset_currency else [asset_currency]
         self.kwargs = kwargs
 
+    def optimize_parameters(self):
+        for asset_currency in self.asset_currency_list:
+            self.kwargs['asset_currency'] = asset_currency
+            file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+            if os.path.exists(file_path):
+                result_df = pd.read_csv(file_path, index_col=0)
+                result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
+                check_parameter_plateau = self.process_results(result_df, self.kwargs)
+                pp_columns = (check_parameter_plateau.columns)[:-1]
+                result_df = result_df.drop(columns=pp_columns, errors='ignore')
+
+                result_df = pd.merge(result_df, check_parameter_plateau, on='strategy', how='inner')
+                cols = [col for col in result_df.columns if col != 'strategy'] + ['strategy']
+                result_df = result_df[cols]
+                result_df = result_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+
+                result_df.to_csv(file_path)
+                print(result_df.head())
+                pass
+
     @staticmethod
-    def function_c(task, **kwargs):
+    def evaluate_strategy(task, **kwargs):
         x = task['x']
         y = task['y']
         lookback_list = [max(x - 10, 0), x, x + 10]
@@ -26,21 +47,22 @@ class ParameterPlateau:
             'lookback_list': lookback_list,
             'threshold_list': threshold_list,
         })
-        unknown_var2 = BacktestEngine.performance_evaluation(task)
-        unknown_var3 = []
-        for i in range(len(unknown_var2)):
-            unknown_var3.append(unknown_var2[i]['result']['sharpe'])
-
-        unknown_var4 = all(x > 1 for x in unknown_var3)
-
-        summary = {
-            'parameter_plateau': unknown_var4,
-            'strategy': task['strategy'], }
-        return summary
-
+        performance_metrics = BacktestEngine.performance_evaluation(task)
+        if performance_metrics:
+            sharpe_ratios = []
+            for i in range(len(performance_metrics)):
+                sharpe_ratios.append(performance_metrics[i]['result']['sharpe'])
+            parameter_plateau = all(x > 1 for x in sharpe_ratios)
+            return {
+                'parameter_plateau': parameter_plateau,
+                'strategy': task['strategy'], }
+        else: return {
+            'parameter_plateau': False,
+            'strategy': task['strategy'],
+        }
 
     @staticmethod
-    def function_b(result_df, kwargs):
+    def process_results(result_df, kwargs):
         strategy_key_list = result_df['strategy'].str.rsplit('|', n=5).str[:-5].str.join('|').unique().tolist()
         backtest_dataframe_map = {strategy_key: CryptoDataService({**kwargs,
             'asset_currency': key_parts[1],
@@ -50,8 +72,7 @@ class ParameterPlateau:
             'endpoint': key_parts[-1]}).create_backtest_dataframe(CryptoExchangeDataService(**{**kwargs, 'timeframe': key_parts[2]}).get_historical_data(True)) for strategy_key in strategy_key_list for key_parts in [strategy_key.split('|')]}
 
         tasks = []
-        for i in range(len(result_df)):
-            row = result_df.iloc[i]
+        for _, row in result_df.iterrows():
             backtest_dataframe_key = '|'.join(row['strategy'].rsplit('|', 5)[:-5])
             backtest_df = backtest_dataframe_map[backtest_dataframe_key].copy()
 
@@ -75,28 +96,6 @@ class ParameterPlateau:
                 'x': row['x'],
                 'y': row['y'],
             })
-            # tasks = [tasks[0]]
         if tasks:
-            unknown_var = (Utilities.run_in_parallel(ParameterPlateau.function_c, tasks) if len(tasks) > 1 else [ParameterPlateau.function_c(tasks[0])])
-            return pd.DataFrame(unknown_var)
-
-
-    def function_a(self):
-        for asset_currency in self.asset_currency_list:
-            self.kwargs['asset_currency'] = asset_currency
-            file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
-            if os.path.exists(file_path):
-                result_df = pd.read_csv(file_path, index_col=0)
-                result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
-                check_parameter_plateau = self.function_b(result_df, self.kwargs)
-                pp_columns = (check_parameter_plateau.columns)[:-1]
-                result_df = result_df.drop(columns=pp_columns, errors='ignore')
-
-                result_df = pd.merge(result_df, check_parameter_plateau, on='strategy', how='inner')
-                cols = [col for col in result_df.columns if col != 'strategy'] + ['strategy']
-                result_df = result_df[cols]
-                result_df = result_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
-
-                result_df.to_csv(file_path)
-                print(result_df.head())
-                pass
+            evaluation_results = (Utilities.run_in_parallel(ParameterPlateau.evaluate_strategy, tasks) if len(tasks) > 1 else [ParameterPlateau.evaluate_strategy(tasks[0])])
+            return pd.DataFrame(evaluation_results)

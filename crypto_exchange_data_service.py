@@ -246,7 +246,10 @@ class CryptoExchangeDataService:
                     'pkl': pd.read_pickle,
                     'parquet': pd.read_parquet,
                     'csv': pd.read_csv}[fmt]
-                saved_df = load_func(file_path)
+                try:
+                    saved_df = load_func(file_path)
+                except Exception as e:
+                    print(f"{e}")
                 first_fetched_timestamp = min(saved_df['unix_timestamp'].iloc[0], first_fetched_timestamp)
                 last_marked_timestamp = min(saved_df['unix_timestamp'].iloc[-1], last_marked_timestamp)
                 break
