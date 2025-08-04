@@ -20,7 +20,7 @@ pd.set_option('display.max_colwidth', None)
 logging.basicConfig(level=logging.INFO)
 
 data_folder = 'data'
-if not os.path.isdir(data_folder): os.mkdir(data_folder)
+os.makedirs(data_folder, exist_ok=True)
 
 
 # Class definition
@@ -113,7 +113,7 @@ class CryptoExchangeDataService:
     # Class-level mutable variables
     pass
 
-    def __init__(self, currency, **kwargs):
+    def __init__(self, **kwargs):
         """Initializes instance variables of the class."""
 
         # Set default values for instance variables
@@ -127,8 +127,6 @@ class CryptoExchangeDataService:
 
         # Update instance variables with provided keyword arguments
         for key, value in kwargs.items(): setattr(self, key, value)
-
-        self.asset_currency = currency
 
         if self.exchange_name not in self.EXCHANGE_NAMES: raise ValueError(f"Exchange '{self.exchange_name}' is not supported.")
         self.exchange = getattr(ccxt, self.exchange_name)()
@@ -175,8 +173,7 @@ class CryptoExchangeDataService:
 
         def resample_data(df, endpoint):
             resample_freq = self.RESAMPLING_FREQUENCY_MAP.get(self.timeframe, 'h')
-            if endpoint == 'price':
-                df = df.resample(resample_freq).agg({
+            if endpoint == 'price': df = df.resample(resample_freq).agg({
                     'unix_timestamp': 'first',  # Take the last timestamp in the period
                     'open': 'first',  # Take the first open price in the period
                     'high': 'max',  # Take the maximum high price in the period
@@ -184,15 +181,13 @@ class CryptoExchangeDataService:
                     'close': 'last',  # Take the last close price in the period
                     'volume': 'sum',  # Sum the volume for the period
                 }).iloc[:-1]
-            elif endpoint == 'open_interest':
-                df = df.resample(resample_freq, label='left', closed='left').agg({
+            elif endpoint == 'open_interest': df = df.resample(resample_freq, label='left', closed='left').agg({
                     'unix_timestamp': 'last',
                     'openInterestAmount': 'first',
                 })
             elif endpoint == 'long_short_ratio':
                 pass
-            elif endpoint == 'premium_index':
-                df = df.resample(resample_freq).agg({
+            elif endpoint == 'premium_index': df = df.resample(resample_freq).agg({
                     'unix_timestamp': 'first',  # Last timestamp in the hour
                     'open': 'first',           # First open price in the hour
                     'high': 'max',             # Maximum high price in the hour
@@ -213,15 +208,12 @@ class CryptoExchangeDataService:
         product_type = 'linear' if endpoint in ['funding_rate', 'open_interest', 'long_short_ratio'] else self.product_type
 
         asset_currency = self.asset_currency.upper()
-        # timeframe = self.TIMEFRAME_MAP[self.timeframe]
         timeframe = '1m'
         symbol = f"{asset_currency}/USDT:USDT" if product_type == 'linear' else f"{asset_currency}/USDT"
-
         params = {'symbol': symbol}
 
         if endpoint == 'open_interest': timeframe = self.OI_INTERVAL_MAP.get(timeframe)
-        elif endpoint == 'long_short_ratio' and timeframe not in ['1h', '1d']:
-            timeframe = '1h'
+        elif endpoint == 'long_short_ratio' and timeframe not in ['1h', '1d']: timeframe = '1h'
         if endpoint == 'funding_rate': timeframe = self.FUNDING_RATE_TIMEFRAME
         else: params.update({'timeframe': timeframe})
         base_path = os.path.join(subfolder_path, f"{asset_currency}|{self.exchange_name}")
@@ -254,7 +246,10 @@ class CryptoExchangeDataService:
                     'pkl': pd.read_pickle,
                     'parquet': pd.read_parquet,
                     'csv': pd.read_csv}[fmt]
-                saved_df = load_func(file_path)
+                try:
+                    saved_df = load_func(file_path)
+                except Exception as e:
+                    print(f"{e}")
                 first_fetched_timestamp = min(saved_df['unix_timestamp'].iloc[0], first_fetched_timestamp)
                 last_marked_timestamp = min(saved_df['unix_timestamp'].iloc[-1], last_marked_timestamp)
                 break

@@ -64,15 +64,19 @@ class GlassnodeDataService:
         since = self.since if not isinstance(self.since, str) else int(pd.to_datetime(self.since).timestamp())
         if since > 1_00_000_000_000: int(since / 1000)
         if self.timeframe == '1d': self.timeframe = '24h'
-        timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
+        # timeframe = self.timeframe if self.timeframe in ['10m', '1h', '24h'] else '1h'
+        if self.timeframe not in ['10m', '1h', '24h']: return
+        else: timeframe = self.timeframe
 
-
-        endpoint_path = metadata_df['path'].iloc[0]
+        try:
+            endpoint_path = metadata_df['path'].iloc[0]
+        except:
+            return
         category = endpoint_path.split('/')[-2]
         endpoint = endpoint_path.split('/')[-1]
 
         if category == 'derivatives': exchange_name = 'deribit'
-        print(endpoint)
+        print(f"{self.factor_currency}|{self.timeframe}|{endpoint}")
 
         params = {
                 'api_key': self.DATA_SOURCE_KEY,
@@ -80,13 +84,31 @@ class GlassnodeDataService:
                 'e': exchange_name,
                 'i': timeframe,
                 's': since
-}
+        }
         try:
             response = requests.get(f"{self.base_url}{endpoint_path}", params=params)
+            time.sleep(1)
             if response.status_code == 200:
                 data = response.json()
-                df = pd.DataFrame(data)
-                return df
+                if endpoint_path != '/derivatives/options_open_interest_distribution':
+                    df = pd.DataFrame(data)
+                    return df
+                else:
+                    for i in data['data']:
+                        calls = i['calls']
+                        puts = i['puts']
+                        call_list = []
+                        put_list = []
+                        for index in range(len(calls)):
+                            call_list.append(calls[index])
+                            put_list.append(puts[index])
+                    call_df = pd.DataFrame(call_list)
+                    call_df.rename(columns={'value': 'call'}, inplace=True)
+                    put_df = pd.DataFrame(put_list)
+                    put_df.rename(columns={'value': 'put'}, inplace=True)
+                    df = pd.merge(call_df, put_df, how='inner', on='strike')
+                    return
+
             else:
                 print(f"{self.factor_currency} <<{endpoint}>>  - {response.text}.")
                 return pd.DataFrame()

@@ -1,51 +1,54 @@
 
 # Custom imports
 from data_analysis import DataAnalysis
-from crypto_exchange_data_service import CryptoExchangeDataService
+
+
+factor_currency = ''
+asset_currency  = 'btc'
+action          = 'long_only'
+indicator       = ''
+orientation     = ''
+since           = '2020-05-01'
+timeframe       = ''
+x               = 0
+y               = 0
+
+data_source     = 'exchange'  # glassnode exchange
+endpoint        = 'price'  # active_1m_3m options_25delta_skew_3_months implied options_open_interest_distribution
+exchange_name   = 'binance'
+product_type    = 'linear'
+
+max_threshold       = 0
+number_of_interval  = 0
+
+update_mode     = True
+minimum_sharpe  = 1
+position_count  = False
+
+##### Mode #####
+backtest_mode       = True
+cross_validate      = True
+parameter_plateau   = True
+walk_forward        = True
+
+generate_equity_curve   = True
+show_equity_curve       = False
+
+show_heatmap        = False
+target_metric       = 'sharpe'  # sharpe, mdd, calmar,
+
+dash_board = False
+
+specific_task = ''
+
+
+asset_currency, factor_currency = map(lambda currency: str(currency).upper(), (asset_currency, factor_currency))
+kwargs = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
 
 if __name__ == '__main__':
 
-    factor_currency = ''
-    asset_currency  = 'btc'
-    action          = ''
-    indicator       = ''
-    orientation     = 'momentum'
-    since           = '2020-05-01'
-    # since           = '2025-06-01'
-    timeframe       = ''
-
-    data_source     = 'glassnode'        # glassnode
-    endpoint        = 'options_25delta_skew_3_months'       # active_1m_3m options_25delta_skew_3_months implied
-    exchange_name   = 'bybit'
-    product_type    = 'linear'
-
-    update_mode         = True
-    minimum_sharpe      = 1.2
-
-    max_threshold       = 0
-    number_of_interval  = 0
-
-    cross_validate = True
-
-    kwargs = {key: value for key, value in locals().items() if not key.startswith('__') and isinstance(value, (str, int, float, bool))}
-
-
     data_service = DataAnalysis(kwargs)
     data_service.data_analysis()
-
-    ##### class 1 #####
-    crypto_exchange_data_service = CryptoExchangeDataService(**kwargs)
-    factor_df = crypto_exchange_data_service.get_historical_data()
-    # price_df = crypto_exchange_data_service.get_historical_data(True)  # True = underlying asset 的價格數據
-
-    print(factor_df.tail(3))
-    # print(price_df.tail(3))
-
-    # sys.exit()
-    #
-    # ##### class 2 #####
-    # factor_df2 = ConvertCcxtDataSerice.get_historical_data(**kwargs)
-    # price_df2 = ConvertCcxtDataSerice.get_historical_data(underlying_asset=True, **kwargs)
 
 
 
