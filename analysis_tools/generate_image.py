@@ -9,7 +9,7 @@ import plotly.express as px
 from backtest_engine import BacktestEngine
 from crypto_data_service import CryptoDataService
 from crypto_exchange_data_service import CryptoExchangeDataService
-from utilities import Utilities
+from analysis_tools.utilities import Utilities
 
 
 class HeatmapGenerator:

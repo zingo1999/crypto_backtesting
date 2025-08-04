@@ -1,6 +1,6 @@
 
 # Custom imports
-from data_analysis import DataAnalysis
+from analysis_tools.data_analysis import DataAnalysis
 
 
 factor_currency = ''
