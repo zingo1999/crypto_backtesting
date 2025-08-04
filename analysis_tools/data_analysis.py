@@ -4,11 +4,11 @@
 # Third-party imports
 
 # Custom imports
-from overfitting_prevention.cross_validator import CrossValidator
-from crypto_data_service import CryptoDataService
+from analysis_tools.crypto_data_service import CryptoDataService
 from analysis_tools.generate_image import EquityCurveGenerator, HeatmapGenerator
-from overfitting_prevention.parameter_plateau import ParameterPlateau
 from analysis_tools.utilities import Utilities
+from overfitting_prevention.cross_validator import CrossValidator
+from overfitting_prevention.parameter_plateau import ParameterPlateau
 from overfitting_prevention.walk_forward_analysis import WalkForwardAnalysis
 
 
