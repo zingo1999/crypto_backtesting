@@ -41,6 +41,7 @@ class CrossValidator:
     def __init__(self, asset_currency, kwargs):
         self.asset_currency_list = ['BTC', 'ETH', 'SOL'] if not asset_currency else [asset_currency]
         self.kwargs = kwargs
+        self.kwargs['update_mode'] = False
 
     @classmethod
     def evaluate_backtest_results(cls, task, **kwargs):
@@ -191,14 +192,13 @@ class CrossValidator:
     def process_backtest_results(self):
         for asset_currency in self.asset_currency_list:
             self.kwargs['asset_currency'] = asset_currency
-            file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+            file_path = f"backtest_results/{asset_currency}/{self.kwargs['since']}/{asset_currency}_filtered_result.csv"
             if os.path.exists(file_path):
-                result_df = pd.read_csv(file_path, index_col=0).query('parameter_plateau').dropna()
+                result_df = pd.read_csv(file_path, index_col=0).query('parameter_plateau').dropna(subset=['training_set', 'testing_set', 'parameter_plateau'])
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].reset_index(drop=True)
                 if result_df.empty: return
                 cv_result_df = self.run_cross_validation(result_df, self.kwargs)
-                if cv_result_df.empty:
-                    return
+                if cv_result_df.empty: return
                 cv_columns = cv_result_df.columns[:-1]
                 result_df = result_df.drop(columns=cv_columns, errors='ignore')
 
@@ -207,10 +207,9 @@ class CrossValidator:
                 result_df = result_df[cols]
                 result_df = result_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
 
-                file_path = f"backtest_results/{asset_currency}/{asset_currency}_optimized_result.csv"
+                file_path = f"backtest_results/{asset_currency}/{self.kwargs['since']}/{asset_currency}_optimized_result.csv"
                 result_df.to_csv(file_path)
                 print(result_df.head())
-                pass
 
 
 

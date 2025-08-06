@@ -13,16 +13,17 @@ class ParameterPlateau:
     def __init__(self, asset_currency, kwargs):
         self.asset_currency_list = ['BTC', 'ETH', 'SOL'] if not asset_currency else [asset_currency]
         self.kwargs = kwargs
+        self.kwargs['update_mode'] = False
 
     def optimize_parameters(self):
         for asset_currency in self.asset_currency_list:
             self.kwargs['asset_currency'] = asset_currency
-            file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+            file_path = f"backtest_results/{asset_currency}/{self.kwargs['since']}/{asset_currency}_filtered_result.csv"
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0)
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
                 check_parameter_plateau = self.process_results(result_df, self.kwargs)
-                pp_columns = (check_parameter_plateau.columns)[:-1]
+                pp_columns = check_parameter_plateau.columns[:-1]
                 result_df = result_df.drop(columns=pp_columns, errors='ignore')
 
                 result_df = pd.merge(result_df, check_parameter_plateau, on='strategy', how='inner')
@@ -32,7 +33,6 @@ class ParameterPlateau:
 
                 result_df.to_csv(file_path)
                 print(result_df.head())
-                pass
 
     @staticmethod
     def evaluate_strategy(task, **kwargs):
@@ -63,12 +63,14 @@ class ParameterPlateau:
     @staticmethod
     def process_results(result_df, kwargs):
         strategy_key_list = result_df['strategy'].str.rsplit('|', n=5).str[:-5].str.join('|').unique().tolist()
-        backtest_dataframe_map = {strategy_key: CryptoDataService({**kwargs,
+        backtest_dataframe_map = {strategy_key: CryptoDataService({
+            **kwargs,
             'asset_currency': key_parts[1],
             'data_source': key_parts[3],
             'factor_currency': key_parts[0],
             'timeframe': key_parts[2],
-            'endpoint': key_parts[-1]}).create_backtest_dataframe(CryptoExchangeDataService(**{**kwargs, 'timeframe': key_parts[2]}).get_historical_data(True)) for strategy_key in strategy_key_list for key_parts in [strategy_key.split('|')]}
+            'endpoint': key_parts[-1]
+        }).create_backtest_dataframe(CryptoExchangeDataService(**{**kwargs, 'timeframe': key_parts[2]}).get_historical_data(True)) for strategy_key in strategy_key_list for key_parts in [strategy_key.split('|')]}
 
         tasks = []
         for _, row in result_df.iterrows():
@@ -82,7 +84,7 @@ class ParameterPlateau:
                 'asset_currency': row['strategy'].split('|')[1],
                 'backtest_df': backtest_df,
                 'data_source': row['strategy'].split('|')[3],
-                'endpoint': row['strategy'].split('|')[4],
+                'endpoint': row['strategy'].split('|')[-6],
                 'factor_currency': row['strategy'].split('|')[0],
                 'indicator': row['strategy'].split('|')[-5],
                 # 'lookback_list': lookback_list,

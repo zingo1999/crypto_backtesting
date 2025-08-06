@@ -1,11 +1,10 @@
 import os
-import math
-import sys
-from typing import Union
 
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
+
+from analysis_tools.backtest_engine import BacktestEngine
 
 
 class Utilities:
@@ -195,14 +194,6 @@ class Utilities:
         # threshold_list = np.round(np.arange(first_threshold_step, max_threshold, threshold_step), 6)
         return threshold_list
 
-    @staticmethod
-    def run_in_parallel(func, param_list, max_cores=None):
-        if not param_list:
-            return []
-        num_cores = max_cores or max(1, min(len(param_list), mp.cpu_count()))
-        with mp.Pool(processes=num_cores) as pool:
-            results = pool.map(func, param_list)
-        return results
 
     @classmethod
     def filter_results_by_sharpe_ratio(cls, results_by_currency, min_sharpe_ratio):
@@ -236,22 +227,32 @@ class Utilities:
         return list(unique_backtest_keys), filtered_results, result_data_list
 
     @classmethod
-    def simple_filtering(cls, kwargs):
+    def results_filtering(cls, kwargs):
         asset_currency = kwargs['asset_currency']
         asset_currency_list = [asset_currency] if asset_currency else ['BTC', 'ETH', 'SOL']
         for asset_currency in asset_currency_list:
-            file_path = f"backtest_results/{asset_currency}/{asset_currency}_result.csv"
+            file_path = f"backtest_results/{asset_currency}/{kwargs['since']}/{asset_currency}_backtest_result.csv"
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0)
-                result_df = result_df[(result_df['sharpe'] > kwargs['minimum_sharpe']) & (result_df['sharpe'] >= result_df['benchmark'] + 0.2)].reset_index(drop=True)
-                file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+                result_df = result_df[(result_df['sharpe'] > kwargs['minimum_sharpe']) & (result_df['calmar'] >= 1) & (result_df['sharpe'] >= result_df['benchmark'] + 0.2)]
+
+                file_path = f"backtest_results/{asset_currency}/{kwargs['since']}/{asset_currency}_filtered_result.csv"
                 if os.path.exists(file_path):
                     existing_df = pd.read_csv(file_path, index_col=0)
+
                     result_df = pd.concat([existing_df, result_df], ignore_index=True).drop_duplicates(subset='strategy', keep='first').sort_values(by='sharpe', ascending=False).reset_index(drop=True)
                 result_df.to_csv(file_path)
-                pass
+                print(result_df.head())
 
 
+    @staticmethod
+    def run_in_parallel(func, param_list, max_cores=None):
+        if not param_list:
+            return []
+        num_cores = max_cores or max(1, min(len(param_list), mp.cpu_count()))
+        with mp.Pool(processes=num_cores) as pool:
+            results = pool.map(func, param_list)
+        return results
 
 
 
