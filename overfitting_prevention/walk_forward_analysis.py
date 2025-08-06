@@ -15,17 +15,18 @@ class WalkForwardAnalysis:
     def __init__(self, asset_currency, kwargs):
         self.asset_currency_list = ['BTC', 'ETH', 'SOL'] if not asset_currency else [asset_currency]
         self.kwargs = kwargs
+        self.kwargs['update_mode'] = False
 
 
     def run_walk_forward_analysis(self):
         for asset_currency in self.asset_currency_list:
             self.kwargs['asset_currency'] = asset_currency
-            file_path = f"backtest_results/{asset_currency}/{asset_currency}_filtered_result.csv"
+            file_path = f"backtest_results/{asset_currency}/{self.kwargs['since']}/{asset_currency}_filtered_result.csv"
             if os.path.exists(file_path):
                 result_df = pd.read_csv(file_path, index_col=0)
                 result_df = result_df[result_df['sharpe'] > self.kwargs['minimum_sharpe']].sort_values(by='strategy').reset_index(drop=True)
                 walk_forward_results = self.prepare_and_execute_walk_forward(result_df, self.kwargs)
-                wf_columns = (walk_forward_results.columns)[:-1]
+                wf_columns = walk_forward_results.columns[:-1]
                 result_df = result_df.drop(columns=wf_columns, errors='ignore')
 
                 result_df = pd.merge(result_df, walk_forward_results, on='strategy', how='inner')
@@ -33,10 +34,8 @@ class WalkForwardAnalysis:
                 result_df = result_df[cols]
                 result_df = result_df.sort_values(by='sharpe', ascending=False).reset_index(drop=True)
 
-                # file_path = f"backtest_results/{asset_currency}/{asset_currency}_walk_forward_result.csv"
                 result_df.to_csv(file_path)
                 print(result_df.head())
-                pass
 
     @staticmethod
     def prepare_and_execute_walk_forward(result_df, kwargs):
@@ -55,7 +54,7 @@ class WalkForwardAnalysis:
             backtest_dataframe_key = '|'.join(row['strategy'].rsplit('|', 5)[:-5])
             backtest_df = backtest_dataframe_map[backtest_dataframe_key].copy()
 
-            train_size = math.floor(len(backtest_df) * 0.7)
+            train_size = math.floor(len(backtest_df) * 0.75)
             training_set = backtest_df.copy().iloc[:train_size]
             testing_set = backtest_df.copy().iloc[train_size:]
 
@@ -80,7 +79,7 @@ class WalkForwardAnalysis:
             })
 
         if tasks:
-            walk_forward_results = (Utilities.run_in_parallel(WalkForwardAnalysis.evaluate_task_performance, tasks) if len(tasks) > 1 else [WalkForwardAnalysis.evaluate_task_performance(tasks[0])])
+            walk_forward_results = Utilities.run_in_parallel(WalkForwardAnalysis.evaluate_task_performance, tasks) if len(tasks) > 1 else [WalkForwardAnalysis.evaluate_task_performance(tasks[0])]
             return pd.DataFrame(walk_forward_results)
 
     @staticmethod

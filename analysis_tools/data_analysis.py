@@ -10,6 +10,7 @@ from analysis_tools.utilities import Utilities
 from overfitting_prevention.cross_validator import CrossValidator
 from overfitting_prevention.parameter_plateau import ParameterPlateau
 from overfitting_prevention.walk_forward_analysis import WalkForwardAnalysis
+from overfitting_prevention.delayed_execution_evaluator import DelayedExecutionEvaluator
 
 
 class DataAnalysis:
@@ -27,9 +28,11 @@ class DataAnalysis:
 
     def data_analysis(self,):
         all_results = {}
-        if self.backtest_mode: all_results = CryptoDataService(self.kwargs).generate_all_backtest_results()
+        if self.backtest_mode:
+            all_results = CryptoDataService(self.kwargs).generate_all_backtest_results()
 
-        Utilities.simple_filtering(self.kwargs)
+        Utilities.results_filtering(self.kwargs)
+        DelayedExecutionEvaluator(self.kwargs['asset_currency'], self.kwargs).filter_and_process_backtest_results()
 
         # if self.dash_board:
         #     DashBoardGenerator(self.kwargs['asset_currency'], self.kwargs).function_a()

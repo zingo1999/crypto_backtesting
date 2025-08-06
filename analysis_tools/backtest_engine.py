@@ -184,7 +184,7 @@ class BacktestEngine:
 
     @classmethod
     def performance_evaluation(cls, backtest_combos, **kwargs):
-        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, generate_equity_curve=False, minimum_sharpe=1, period='overall', **kwargs):
+        def strategy_effectiveness(action, asset_currency, backtest_df, data_source, endpoint, factor_currency, indicator, lookback_list, orientation, threshold_list, timeframe, generate_equity_curve=False, minimum_sharpe=1, period='overall', t_plus=None, **kwargs):
             save_result = False
             backtest_dataframe_key = f"{factor_currency}|{asset_currency}|{timeframe}|{endpoint}"
             result_list = []
@@ -202,6 +202,7 @@ class BacktestEngine:
                         'y': y,
                     }
                     df = cls.compute_position(**parameters)
+                    if t_plus: df['pos'] = df['pos'].shift(t_plus)
                     df['pos_count'] = (df['pos'] != 0).cumsum()
                     df['trade'] = (df['pos'].diff().abs() > 0).astype(int)
                     df['pnl'] = df['pos'].shift(1) * df['chg'] - df['trade'] * 0.06 / 100
@@ -264,7 +265,7 @@ class BacktestEngine:
                             'pos_count': pos_count,
                             'sharpe': sharpe,
                             'trades': trades,
-                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|{period}",
+                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}",
                             'x': x,
                             'y': y,
                         }
@@ -298,7 +299,7 @@ class BacktestEngine:
                             'data_quantity': len(df),
                             'end': df.index[-1],
                             'since': df.index[0],
-                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}|{period}"
+                            'title': f"{factor_currency}|{asset_currency}|{timeframe}|{data_source}|{endpoint}|{indicator}|{orientation}|{action}"
                     })
 
                     if sharpe >= minimum_sharpe:
@@ -310,6 +311,7 @@ class BacktestEngine:
         result = strategy_effectiveness(**backtest_combos)
         if result:
             return result
+
 
 
 

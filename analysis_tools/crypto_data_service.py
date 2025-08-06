@@ -25,7 +25,7 @@ class CryptoDataService:
         self.indicator = params.get('indicator', '')
         self.kwargs = params
         self.max_threshold = params.get('max_threshold', None)
-        # self.minimum_sharpe = params.get('minimum_sharpe', None)
+        self.minimum_sharpe = params.get('minimum_sharpe', None)
         self.number_of_interval = params.get('number_of_interval', None)
         self.orientation = params.get('orientation', '')
         self.timeframe = params.get('timeframe', '')
@@ -110,7 +110,8 @@ class CryptoDataService:
             for timeframe in self.timeframe_list:
                 self.kwargs.update({
                     'asset_currency': asset_currency,
-                    'timeframe': timeframe, })
+                    'timeframe': timeframe,
+                })
                 price_df = CryptoExchangeDataService(**self.kwargs).get_historical_data(True)
                 endpoint_list = self.get_endpoint_list()
                 for endpoint in endpoint_list:
@@ -136,7 +137,7 @@ class CryptoDataService:
                                         'indicator': indicator,
                                         'lookback_list': lookback_list,
                                         'orientation': orientation,
-                                        # 'minimum_sharpe': self.minimum_sharpe,
+                                        'minimum_sharpe': self.kwargs['minimum_sharpe'],
                                         # 't_plus': t_plus,
                                         'strategy': f"{indicator}{orientation}{action}",
                                         'threshold_list': threshold_list,
@@ -155,9 +156,9 @@ class CryptoDataService:
         if all_results:
             asset_currency_keys = list(all_results.keys())
             for asset_currency in asset_currency_keys:
-                backtest_results_folder = f"backtest_results/{asset_currency}"
+                backtest_results_folder = f"backtest_results/{asset_currency}/{self.kwargs['since']}"
                 os.makedirs(backtest_results_folder, exist_ok=True)
-                subfolder_path = os.path.join(backtest_results_folder, f"{asset_currency}_result")
+                file_path = os.path.join(backtest_results_folder, f"{asset_currency}_backtest_result")
                 different_timeframe_results = all_results[asset_currency]
                 extracted_results = []
                 for different_stratgy_results in different_timeframe_results:
@@ -166,13 +167,13 @@ class CryptoDataService:
                             extracted_results.append(data['result'])
                 results_df = pd.DataFrame(extracted_results)
 
-                file_path = f"{subfolder_path}.csv"
-                if os.path.exists(file_path):
-                    existing_df = pd.read_csv(file_path, index_col=0)
+                file_name = f"{file_path}.csv"
+                if os.path.exists(file_name):
+                    existing_df = pd.read_csv(file_name, index_col=0)
                     results_df = pd.concat([existing_df, results_df], ignore_index=True).drop_duplicates(subset='strategy', keep='last')
 
-                results_df = results_df[results_df['sharpe'] >= 1].sort_values(by='sharpe', ascending=False).reset_index(drop=True)
-                results_df.to_csv(file_path)
-                print(results_df.head(5))
+                results_df = results_df[results_df['sharpe'] >= self.minimum_sharpe].sort_values(by='sharpe', ascending=False).reset_index(drop=True)
+                results_df.to_csv(file_name)
+                print(results_df.head())
         return all_results
 
